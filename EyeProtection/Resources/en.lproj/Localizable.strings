@@ -1,0 +1,200 @@
+/* Language */
+"settings.section.language" = "Language";
+"settings.language.picker" = "App Language";
+"settings.language.footer" = "In-app text updates immediately. Future system notifications will use the new language.";
+"language.system" = "System Default";
+"language.zh_hans" = "简体中文";
+"language.english" = "English";
+
+/* Application and menu bar */
+"app.analytics.window_title" = "GazeEase Analytics";
+"menubar.status.accessibility_label" = "Eye comfort status";
+"menubar.status.accessibility_value" = "Fatigue %@";
+"menubar.status.accessibility_value.monitoring_incomplete" = "Fatigue %@, monitoring incomplete";
+
+/* Presence */
+"presence.waiting_first_input" = "Waiting for first input";
+"presence.resting" = "Resting";
+"presence.active_interaction" = "Using your Mac";
+"presence.passive_static" = "Reading or thinking";
+"presence.idle_uncertain" = "Waiting for detectable activity";
+"presence.unobservable" = "Monitoring permission incomplete";
+"presence.away_confirmed" = "Away from your Mac";
+
+/* Reminder modes */
+"reminder.mode.system_notification.name" = "System Notification";
+"reminder.mode.system_notification.description" = "Shows one quiet notification in the top-right corner. Ignore it to keep working, or click it to start a rest.";
+"reminder.mode.top_panel.name" = "Top Panel";
+"reminder.mode.top_panel.description" = "Shows a two-button panel at the top of the screen. Choosing Not Now closes it immediately.";
+"reminder.mode.full_screen.name" = "Full Screen";
+"reminder.mode.full_screen.description" = "Shows a full-screen reminder with two actions. Choosing Not Now closes it immediately.";
+
+/* Reminder themes */
+"theme.quiet_horizon.name" = "Quiet Horizon";
+"theme.quiet_horizon.description" = "An open lakeside valley and distant light, designed as a calm everyday default.";
+"theme.forest_light.name" = "Forest Light";
+"theme.forest_light.description" = "A misty forest that wraps the view in a soft, quiet atmosphere.";
+"theme.alpine_mist.name" = "Alpine Mist";
+"theme.alpine_mist.description" = "Cool peaks and low clouds create a restrained, airy view.";
+"theme.twilight_dunes.name" = "Twilight Dunes";
+"theme.twilight_dunes.description" = "Blue-hour light and warm dunes create a gentle, welcoming mood.";
+"theme.current" = "Current Theme";
+"theme.selection.manual" = "Manual";
+"theme.selection.automatic" = "Automatic · %d min";
+"theme.selection.accessibility.manual" = "Selected manually";
+"theme.selection.accessibility.automatic" = "Changes automatically every %d minutes";
+"theme.current.accessibility" = "Current theme, %@";
+"theme.background.accessibility" = "Reminder background";
+"theme.selected" = "Selected";
+"theme.not_selected" = "Not selected";
+
+/* Actions and quantities */
+"reminder.action.defer" = "Not Now";
+"reminder.action.begin" = "Start Rest";
+"unit.second.one" = "%d second";
+"unit.second.other" = "%d seconds";
+"unit.minute.one" = "%d minute";
+"unit.minute.other" = "%d minutes";
+"unit.hour.one" = "%d hour";
+"unit.hour.other" = "%d hours";
+"unit.time.one" = "%d time";
+"unit.time.other" = "%d times";
+"unit.minute.short" = "min";
+"unit.second.short" = "sec";
+
+/* Menu panel */
+"menu.header.rest_required" = "Your Eyes Need a Rest";
+"menu.header.current_fatigue" = "Current Fatigue";
+"menu.header.accessibility.rest_required" = "Your eyes need a rest. Current fatigue %@. Time since first reminder %@.";
+"menu.header.accessibility.current_fatigue" = "Current fatigue %@";
+"menu.overload_since" = "Since first reminder: %@";
+"menu.action.begin_rest" = "Start Rest";
+"menu.action.rest_now" = "Take a Rest";
+"menu.action.begin_rest.hint_required" = "Start a complete rest with a full-screen countdown";
+"menu.action.begin_rest.hint_optional" = "Start a complete rest now";
+"menu.action.analytics" = "Analytics";
+"menu.action.settings" = "Settings";
+"menu.action.quit" = "Quit GazeEase";
+"menu.resting" = "Resting";
+"menu.rest_remaining" = "%d seconds remaining";
+"menu.monitoring_incomplete" = "Monitoring incomplete";
+
+/* Top reminder panel */
+"overdue_panel.title" = "Time to Rest Your Eyes";
+"overdue_panel.detail" = "Fatigue %@ · Since reminder %@";
+"overdue_panel.accessibility" = "Your eyes need a rest. Current fatigue %@.";
+
+/* Full-screen reminder and rest */
+"overlay.decision.title" = "Your Eyes Need a Rest";
+"overlay.decision.detail" = "Current fatigue %@ · Since first reminder %@";
+"overlay.decision.accessibility_value" = "Current fatigue %@. Time since first reminder %@.";
+"overlay.decision.defer.hint" = "Close this reminder and keep accumulating fatigue";
+"overlay.decision.begin.hint" = "Start the complete rest countdown";
+"overlay.resting.seconds_unit" = "sec";
+"overlay.resting.title" = "Look Into the Distance and Relax Your Eyes";
+"overlay.resting.subtitle" = "Please avoid using the keyboard, mouse, or trackpad";
+"overlay.resting.interruption_notice" = "Input will interrupt this rest. Any fatigue already recovered will be kept.";
+"overlay.resting.accessibility" = "Resting, %d seconds remaining";
+
+/* Notifications */
+"notification.milestone.title" = "Fatigue Reached %d%%";
+"notification.milestone.body" = "Current fatigue is %@. Ignore this notification to keep working, or click it to start a rest.";
+
+/* Settings */
+"settings.section.appearance" = "Reminder Appearance";
+"settings.theme.random_rotation" = "Automatically Change Themes";
+"settings.theme.rotation_interval" = "Change Interval";
+"settings.theme.rotation_interval.accessibility_label" = "Automatic theme change interval";
+"settings.theme.rotation_interval.accessibility_hint" = "Enter an integer from 5 to 1440, in minutes";
+"settings.theme.rotation_footer" = "Randomly changes among all themes every %d minutes without repeating the same theme twice. Changes are delayed while a reminder or rest screen is visible.";
+"settings.section.eye_rules" = "Eye Comfort Rules";
+"settings.work_duration" = "Remind Me After";
+"settings.work_duration.accessibility_hint" = "Enter an integer from 1 to 180, in minutes";
+"settings.rest_duration" = "Complete Rest Duration";
+"settings.rest_duration.accessibility_hint" = "Enter an integer from 5 to 300, in seconds";
+"settings.duration.editing_disabled" = "You can change these durations after the current rest finishes or is interrupted.";
+"settings.duration.footer" = "Enter 1–180 minutes of use and 5–300 seconds of rest. Changing the use duration recalculates fatigue; the rest duration only changes the countdown.";
+"settings.inactivity.enabled" = "Complete a Rest After Long Inactivity";
+"settings.inactivity.duration" = "Inactive For";
+"settings.inactivity.duration.accessibility_label" = "Inactivity duration before completing a rest";
+"settings.inactivity.duration.accessibility_hint" = "Enter an integer from 1 to 180, in minutes";
+"settings.inactivity.footer" = "If there is no keyboard, mouse, or trackpad input for the full duration, fatigue is cleared and the rest requirement is dismissed. Any input restarts the timer.";
+"settings.reminder_mode" = "First Reminder Style";
+"settings.notification.denied" = "Notifications are not allowed, so GazeEase switched to the top panel.";
+"settings.notification.open" = "Open Notification Settings";
+"settings.section.monitoring_permission" = "Monitoring Permission";
+"settings.input_monitoring.title" = "Input Monitoring";
+"settings.input_monitoring.description" = "Reads only input event types and times. It never records keystrokes or pointer coordinates.";
+"settings.input_monitoring.required" = "Input Monitoring permission is required before fatigue timing can begin.";
+"settings.input_monitoring.stale_permission" = "If the system switch is already on but this still shows as unauthorized, turn off the old switch and authorize GazeEase again.";
+"settings.input_monitoring.starting" = "Input monitoring is starting. Fatigue will not accumulate yet.";
+"settings.input_monitoring.running" = "Monitoring is running. Fatigue starts accumulating after the first keyboard, mouse, or trackpad activity.";
+"settings.input_monitoring.recheck" = "Check Permission Again";
+"settings.permission.granted" = "Allowed";
+"settings.permission.authorize" = "Allow";
+"settings.section.general" = "General";
+"settings.launch_at_login" = "Launch at Login";
+"settings.show_onboarding" = "Show Getting Started Again";
+"settings.data_storage" = "Data Storage";
+"settings.data_storage.local_only" = "Stored only on this Mac";
+"settings.clear_data" = "Clear All Analytics Data";
+"settings.section.privacy" = "Privacy";
+"settings.privacy.description" = "GazeEase does not read or record your screen and does not need Screen Recording permission. Automatic rest uses only the time since the last input reported by the system. The app never saves keystrokes, pointer coordinates, window titles, audio, or clipboard contents, and it never uploads monitoring data.";
+"settings.clear_data.alert_title" = "Clear All Analytics Data?";
+"settings.clear_data.cancel" = "Cancel";
+"settings.clear_data.confirm" = "Clear";
+"settings.clear_data.alert_message" = "Fatigue history, rest records, and summaries will be permanently deleted. Your current fatigue state will not change.";
+
+/* Onboarding */
+"onboarding.window_title" = "Welcome to GazeEase";
+"onboarding.language.label" = "Language";
+"onboarding.language.accessibility_label" = "Choose the app language";
+"onboarding.title" = "Make Rest Feel Natural";
+"onboarding.subtitle" = "GazeEase estimates eye fatigue from input activity and gently reminds you to look into the distance and relax your eyes.";
+"onboarding.permission.title" = "Allow Input Monitoring";
+"onboarding.permission.description" = "This helps determine whether you are using your Mac. GazeEase reads only input event types and times, never keystrokes or pointer coordinates.";
+"onboarding.permission.authorize" = "Allow";
+"onboarding.permission.authorize.accessibility_hint" = "Open the system Input Monitoring permission";
+"onboarding.permission.status.authorization_required" = "Permission is required before timing can begin";
+"onboarding.permission.status.starting" = "Input monitoring is starting";
+"onboarding.permission.status.ready" = "Input monitoring is ready";
+"onboarding.privacy.title" = "Your Data Stays on This Mac";
+"onboarding.privacy.description" = "GazeEase does not read your screen or save keystrokes, pointer coordinates, window titles, audio, or clipboard contents, and it never uploads monitoring data.";
+"onboarding.finish" = "Start Using GazeEase";
+"onboarding.finish.accessibility_hint" = "Close this guide and start using GazeEase";
+
+/* Analytics */
+"analytics.title" = "Eye Comfort Analytics";
+"analytics.disclaimer" = "Fatigue is a behavioral estimate based on activity on this Mac, not a medical diagnosis.";
+"analytics.range.label" = "Time Range";
+"analytics.range.today" = "Today";
+"analytics.range.week" = "Last 7 Days";
+"analytics.current_fatigue" = "Current Fatigue";
+"analytics.waiting_for_rest" = "Waiting for a Complete Rest";
+"analytics.overload_since" = "Since first reminder: %@";
+"analytics.rest_frequency" = "A rest is recommended every %d minutes";
+"analytics.chart.title" = "Fatigue Over Time";
+"analytics.chart.threshold" = "Rest required at 100%";
+"analytics.chart.empty.title" = "No Data Yet";
+"analytics.chart.empty.description" = "Fatigue changes will appear here after monitoring begins.";
+"analytics.chart.axis.time" = "Time";
+"analytics.chart.axis.fatigue" = "Fatigue";
+"analytics.chart.axis.date" = "Date";
+"analytics.chart.daily_peak" = "Daily Peak";
+"analytics.chart.rest_line" = "Rest Threshold";
+"analytics.metric.peak_fatigue.title" = "Peak Fatigue";
+"analytics.metric.peak_fatigue.detail" = "Highest value in the selected range";
+"analytics.metric.overload_duration.title" = "Overload Time";
+"analytics.metric.overload_duration.detail" = "Fatigue above 100%";
+"analytics.metric.longest_usage.title" = "Longest Continuous Use";
+"analytics.metric.longest_usage.detail" = "Between complete rests";
+"analytics.metric.completed_rest.title" = "Complete Rests";
+"analytics.metric.completed_rest.detail" = "Completed the rest duration set at that time";
+"analytics.metric.interrupted_rest.title" = "Interrupted Rests";
+"analytics.metric.interrupted_rest.detail" = "Input activity was detected";
+"analytics.metric.average_response.title" = "Average Response";
+"analytics.metric.average_response.detail" = "From reminder to starting a rest";
+"analytics.evidence.manual_rest" = "Manual Rest";
+"analytics.evidence.lock_or_sleep" = "Lock Screen / Sleep";
+"analytics.evidence.inactivity_rest" = "Inactivity Rest";
+"analytics.evidence.deferred_rest" = "Not Now";

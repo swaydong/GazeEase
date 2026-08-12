@@ -1,0 +1,28 @@
+.DS_Store
+
+# Xcode user state and generated build products
+DerivedData/
+Build/
+build/
+Dist/
+Release/
+Preview/
+design-qa.md
+*.xcarchive
+*.xcresult
+*.dmg
+*.pkg
+*.zip
+*.sha256
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+*.app/
+
+# Local signing material and secrets
+Signing.xcconfig
+.env
+.env.*
+*.p12
+*.cer
+*.mobileprovision

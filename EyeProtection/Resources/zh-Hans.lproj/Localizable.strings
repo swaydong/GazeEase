@@ -1,0 +1,200 @@
+/* Language */
+"settings.section.language" = "语言";
+"settings.language.picker" = "App 语言";
+"settings.language.footer" = "切换后立即更新 App 内文案；系统通知会在下次发送时使用新语言。";
+"language.system" = "跟随系统";
+"language.zh_hans" = "简体中文";
+"language.english" = "English";
+
+/* Application and menu bar */
+"app.analytics.window_title" = "GazeEase 分析";
+"menubar.status.accessibility_label" = "护眼状态";
+"menubar.status.accessibility_value" = "疲劳度 %@";
+"menubar.status.accessibility_value.monitoring_incomplete" = "疲劳度 %@，监控不完整";
+
+/* Presence */
+"presence.waiting_first_input" = "等待首次输入";
+"presence.resting" = "正在休息";
+"presence.active_interaction" = "正在使用电脑";
+"presence.passive_static" = "静态阅读或思考";
+"presence.idle_uncertain" = "等待可判断的活动";
+"presence.unobservable" = "监控权限不完整";
+"presence.away_confirmed" = "已离开电脑";
+
+/* Reminder modes */
+"reminder.mode.system_notification.name" = "系统通知";
+"reminder.mode.system_notification.description" = "在右上角显示一次无声通知；忽略即可继续工作，点击通知则开始休息。";
+"reminder.mode.top_panel.name" = "顶部弹窗";
+"reminder.mode.top_panel.description" = "在屏幕顶部显示双按钮弹窗；选择暂不休息后立即关闭。";
+"reminder.mode.full_screen.name" = "全屏提醒";
+"reminder.mode.full_screen.description" = "展示全屏双按钮提醒；选择暂不休息后立即关闭。";
+
+/* Reminder themes */
+"theme.quiet_horizon.name" = "湖谷地平线";
+"theme.quiet_horizon.description" = "安静开阔的湖谷与远光，适合作为日常默认。";
+"theme.forest_light.name" = "林间天光";
+"theme.forest_light.description" = "薄雾森林包裹视野，氛围柔和而沉静。";
+"theme.alpine_mist.name" = "雪岭晨雾";
+"theme.alpine_mist.description" = "清冷雪岭与低云，让视觉更克制、通透。";
+"theme.twilight_dunes.name" = "暮色沙丘";
+"theme.twilight_dunes.description" = "蓝调暮色与温暖沙丘，整体更柔和温润。";
+"theme.current" = "当前皮肤";
+"theme.selection.manual" = "手动选择";
+"theme.selection.automatic" = "自动 · %d 分钟";
+"theme.selection.accessibility.manual" = "手动选择";
+"theme.selection.accessibility.automatic" = "自动随机更换，每 %d 分钟";
+"theme.current.accessibility" = "当前皮肤，%@";
+"theme.background.accessibility" = "提醒背景";
+"theme.selected" = "已选择";
+"theme.not_selected" = "未选择";
+
+/* Actions and quantities */
+"reminder.action.defer" = "暂不休息";
+"reminder.action.begin" = "开始休息";
+"unit.second.one" = "%d 秒";
+"unit.second.other" = "%d 秒";
+"unit.minute.one" = "%d 分钟";
+"unit.minute.other" = "%d 分钟";
+"unit.hour.one" = "%d 小时";
+"unit.hour.other" = "%d 小时";
+"unit.time.one" = "%d 次";
+"unit.time.other" = "%d 次";
+"unit.minute.short" = "分钟";
+"unit.second.short" = "秒";
+
+/* Menu panel */
+"menu.header.rest_required" = "眼睛需要休息";
+"menu.header.current_fatigue" = "当前疲劳度";
+"menu.header.accessibility.rest_required" = "眼睛需要休息，当前疲劳度 %@，距首次提醒 %@";
+"menu.header.accessibility.current_fatigue" = "当前疲劳度 %@";
+"menu.overload_since" = "距首次提醒 %@";
+"menu.action.begin_rest" = "开始休息";
+"menu.action.rest_now" = "现在休息一下";
+"menu.action.begin_rest.hint_required" = "开始完整休息并显示全屏倒计时";
+"menu.action.begin_rest.hint_optional" = "立即开始一次完整休息";
+"menu.action.analytics" = "分析";
+"menu.action.settings" = "设置";
+"menu.action.quit" = "退出 GazeEase";
+"menu.resting" = "正在休息";
+"menu.rest_remaining" = "还需 %d 秒";
+"menu.monitoring_incomplete" = "监控不完整";
+
+/* Top reminder panel */
+"overdue_panel.title" = "该让眼睛休息了";
+"overdue_panel.detail" = "疲劳 %@ · 距提醒 %@";
+"overdue_panel.accessibility" = "眼睛需要休息，当前疲劳度 %@";
+
+/* Full-screen reminder and rest */
+"overlay.decision.title" = "眼睛需要休息";
+"overlay.decision.detail" = "当前疲劳度 %@ · 距首次提醒 %@";
+"overlay.decision.accessibility_value" = "当前疲劳度 %@，距首次提醒 %@";
+"overlay.decision.defer.hint" = "关闭本次提醒并继续累计疲劳度";
+"overlay.decision.begin.hint" = "开始完整休息倒计时";
+"overlay.resting.seconds_unit" = "秒";
+"overlay.resting.title" = "望向远处，放松眼睛";
+"overlay.resting.subtitle" = "请暂时不要使用键盘、鼠标或触控板";
+"overlay.resting.interruption_notice" = "检测到操作会中断本次休息，已恢复的疲劳度会保留";
+"overlay.resting.accessibility" = "正在休息，还剩 %d 秒";
+
+/* Notifications */
+"notification.milestone.title" = "疲劳度已达到 %d%%";
+"notification.milestone.body" = "当前疲劳值 %@。忽略即可继续工作，点击通知开始休息。";
+
+/* Settings */
+"settings.section.appearance" = "提醒外观";
+"settings.theme.random_rotation" = "自动随机更换皮肤";
+"settings.theme.rotation_interval" = "自动更换间隔";
+"settings.theme.rotation_interval.accessibility_label" = "自动随机更换皮肤间隔";
+"settings.theme.rotation_interval.accessibility_hint" = "输入 5 到 1440 之间的整数，单位为分钟";
+"settings.theme.rotation_footer" = "每隔 %d 分钟从全部皮肤中随机更换，不会连续重复。提醒或休息界面显示时会延后。";
+"settings.section.eye_rules" = "护眼规则";
+"settings.work_duration" = "使用多久后提醒";
+"settings.work_duration.accessibility_hint" = "输入 1 到 180 之间的整数，单位为分钟";
+"settings.rest_duration" = "完整休息时长";
+"settings.rest_duration.accessibility_hint" = "输入 5 到 300 之间的整数，单位为秒";
+"settings.duration.editing_disabled" = "休息进行中，完成或中断后可以修改时长。";
+"settings.duration.footer" = "可直接输入 1–180 分钟和 5–300 秒。调整使用时长会重算疲劳百分比；休息时长只影响倒计时。";
+"settings.inactivity.enabled" = "长时间无操作时自动完成休息";
+"settings.inactivity.duration" = "连续无操作达到";
+"settings.inactivity.duration.accessibility_label" = "连续无操作多久后完成休息";
+"settings.inactivity.duration.accessibility_hint" = "输入 1 到 180 之间的整数，单位为分钟";
+"settings.inactivity.footer" = "连续达到设定时长都没有键盘、鼠标或触控板操作时，会清空疲劳度并解除休息要求；任何输入都会重新计时。";
+"settings.reminder_mode" = "首次提醒方式";
+"settings.notification.denied" = "系统通知未授权，已自动改用顶部弹窗。";
+"settings.notification.open" = "打开通知设置";
+"settings.section.monitoring_permission" = "监控权限";
+"settings.input_monitoring.title" = "输入监控";
+"settings.input_monitoring.description" = "只读取输入事件类型和时间，不记录按键内容或鼠标坐标。";
+"settings.input_monitoring.required" = "需要完成输入监控授权，疲劳计时才会开始。";
+"settings.input_monitoring.stale_permission" = "如果系统开关已经打开但这里仍显示未授权，请关闭旧开关后重新授权。";
+"settings.input_monitoring.starting" = "输入监控正在启动；疲劳值暂时不会累积。";
+"settings.input_monitoring.running" = "监控已运行，首次键盘、鼠标或触控板活动后开始累计疲劳。";
+"settings.input_monitoring.recheck" = "重新检测权限";
+"settings.permission.granted" = "已授权";
+"settings.permission.authorize" = "去授权";
+"settings.section.general" = "通用";
+"settings.launch_at_login" = "登录时自动启动";
+"settings.show_onboarding" = "再次查看新手指引";
+"settings.data_storage" = "数据存储";
+"settings.data_storage.local_only" = "仅保存在这台 Mac";
+"settings.clear_data" = "清除所有分析数据";
+"settings.section.privacy" = "隐私";
+"settings.privacy.description" = "GazeEase 不读取或录制屏幕内容，不需要屏幕录制权限。自动休息只读取系统提供的距最近一次输入时长。App 不保存按键、鼠标坐标、窗口标题、音频或剪贴板内容，也不会上传监控数据。";
+"settings.clear_data.alert_title" = "清除所有分析数据？";
+"settings.clear_data.cancel" = "取消";
+"settings.clear_data.confirm" = "清除";
+"settings.clear_data.alert_message" = "疲劳历史、休息记录和汇总数据都会被永久删除，当前疲劳状态不会改变。";
+
+/* Onboarding */
+"onboarding.window_title" = "欢迎使用 GazeEase";
+"onboarding.language.label" = "语言";
+"onboarding.language.accessibility_label" = "选择 App 语言";
+"onboarding.title" = "让休息自然发生";
+"onboarding.subtitle" = "GazeEase 根据输入活动估算用眼疲劳，在合适的时候提醒你望向远处、放松眼睛。";
+"onboarding.permission.title" = "允许输入监控";
+"onboarding.permission.description" = "用于判断你是否正在使用电脑。只读取输入事件类型和时间，不记录按键内容或鼠标坐标。";
+"onboarding.permission.authorize" = "去授权";
+"onboarding.permission.authorize.accessibility_hint" = "打开系统输入监控授权";
+"onboarding.permission.status.authorization_required" = "需要授权后才能开始计时";
+"onboarding.permission.status.starting" = "输入监控正在启动";
+"onboarding.permission.status.ready" = "输入监控已就绪";
+"onboarding.privacy.title" = "数据只留在这台 Mac";
+"onboarding.privacy.description" = "不读取屏幕内容，不保存按键、鼠标坐标、窗口标题、音频或剪贴板，也不会上传监控数据。";
+"onboarding.finish" = "开始使用 GazeEase";
+"onboarding.finish.accessibility_hint" = "关闭新手指引并开始使用";
+
+/* Analytics */
+"analytics.title" = "用眼分析";
+"analytics.disclaimer" = "疲劳度是根据本机活动估算的行为指标，不是医学诊断。";
+"analytics.range.label" = "时间范围";
+"analytics.range.today" = "今天";
+"analytics.range.week" = "近 7 日";
+"analytics.current_fatigue" = "当前疲劳度";
+"analytics.waiting_for_rest" = "等待完整休息";
+"analytics.overload_since" = "距首次提醒 %@";
+"analytics.rest_frequency" = "每 %d 分钟建议休息一次";
+"analytics.chart.title" = "疲劳度曲线";
+"analytics.chart.threshold" = "100% 需要休息";
+"analytics.chart.empty.title" = "暂无记录";
+"analytics.chart.empty.description" = "开始监控后，疲劳变化会显示在这里。";
+"analytics.chart.axis.time" = "时间";
+"analytics.chart.axis.fatigue" = "疲劳度";
+"analytics.chart.axis.date" = "日期";
+"analytics.chart.daily_peak" = "每日峰值";
+"analytics.chart.rest_line" = "休息线";
+"analytics.metric.peak_fatigue.title" = "峰值疲劳";
+"analytics.metric.peak_fatigue.detail" = "所选时段内的最高值";
+"analytics.metric.overload_duration.title" = "超负荷时长";
+"analytics.metric.overload_duration.detail" = "疲劳度超过 100%";
+"analytics.metric.longest_usage.title" = "最长连续使用";
+"analytics.metric.longest_usage.detail" = "两次完整休息之间";
+"analytics.metric.completed_rest.title" = "完整休息";
+"analytics.metric.completed_rest.detail" = "完成当时设定的休息时长";
+"analytics.metric.interrupted_rest.title" = "休息中断";
+"analytics.metric.interrupted_rest.detail" = "检测到输入操作";
+"analytics.metric.average_response.title" = "平均响应";
+"analytics.metric.average_response.detail" = "提醒到开始休息";
+"analytics.evidence.manual_rest" = "手动休息";
+"analytics.evidence.lock_or_sleep" = "锁屏 / 睡眠";
+"analytics.evidence.inactivity_rest" = "无操作休息";
+"analytics.evidence.deferred_rest" = "暂不休息";
