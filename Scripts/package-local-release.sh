@@ -6,6 +6,8 @@ IFS=$'\n\t'
 readonly EXPECTED_BUNDLE_ID="com.local.EyeProtection"
 readonly EXPECTED_TEAM_ID="3Q9DKW2UKF"
 readonly EXPECTED_EXECUTABLE="Eye Protection"
+readonly EXPECTED_BUILD="37"
+readonly EXPECTED_VERSION="1.1.0"
 readonly PROJECT_NAME="EyeProtection.xcodeproj"
 readonly SCHEME_NAME="EyeProtection"
 
@@ -54,10 +56,14 @@ verify_local_app() {
 
     actual_build="$(read_info_value "$app_path" CFBundleVersion)"
     [[ "$actual_build" =~ ^[0-9]+$ ]] || fail "Invalid build number: $actual_build"
+    [[ "$actual_build" == "$EXPECTED_BUILD" ]] || \
+        fail "Unexpected build number: $actual_build (expected: $EXPECTED_BUILD)"
 
     actual_version="$(read_info_value "$app_path" CFBundleShortVersionString)"
     [[ "$actual_version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || \
         fail "Invalid marketing version: $actual_version"
+    [[ "$actual_version" == "$EXPECTED_VERSION" ]] || \
+        fail "Unexpected marketing version: $actual_version (expected: $EXPECTED_VERSION)"
 
     signing_output="$(signature_details "$app_path")"
     actual_team="$(/usr/bin/awk -F= '$1 == "TeamIdentifier" { print substr($0, index($0, "=") + 1); exit }' <<< "$signing_output")"

@@ -15,7 +15,7 @@ final class RestOverlaySnapshotTests: XCTestCase {
         let presentation: RestOverlayPresentation
     }
 
-    func testAcceptanceScreenshotMatrixRendersAtExactSizes() throws {
+    func testAcceptanceScreenshotMatrixRendersAtExactSizes() async throws {
         let viewports = [
             Viewport(name: "1440x900", size: CGSize(width: 1440, height: 900)),
             Viewport(name: "1470x956", size: CGSize(width: 1470, height: 956)),
@@ -68,29 +68,27 @@ final class RestOverlaySnapshotTests: XCTestCase {
 
         for viewport in viewports {
             for state in states {
-                try autoreleasepool {
-                    let data = try render(
-                        presentation: state.presentation,
-                        size: viewport.size,
-                        reduceMotion: false,
-                        reduceTransparency: false
-                    )
-                    let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data))
-                    XCTAssertEqual(bitmap.pixelsWide, Int(viewport.size.width))
-                    XCTAssertEqual(bitmap.pixelsHigh, Int(viewport.size.height))
-                    XCTAssertGreaterThan(data.count, 100_000)
+                let data = try await render(
+                    presentation: state.presentation,
+                    size: viewport.size,
+                    reduceMotion: false,
+                    reduceTransparency: false
+                )
+                let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data))
+                XCTAssertEqual(bitmap.pixelsWide, Int(viewport.size.width))
+                XCTAssertEqual(bitmap.pixelsHigh, Int(viewport.size.height))
+                XCTAssertGreaterThan(data.count, 100_000)
 
-                    if let outputDirectory {
-                        let output = outputDirectory
-                            .appendingPathComponent("\(state.name)-\(viewport.name).png")
-                        try data.write(to: output, options: .atomic)
-                    }
+                if let outputDirectory {
+                    let output = outputDirectory
+                        .appendingPathComponent("\(state.name)-\(viewport.name).png")
+                    try data.write(to: output)
                 }
             }
         }
     }
 
-    func testEveryThemeRendersDecisionAndUnifiedCountdown() throws {
+    func testEveryThemeRendersDecisionAndUnifiedCountdown() async throws {
         let outputDirectory = screenshotOutputDirectory()
         let size = CGSize(width: 1440, height: 900)
         let states = [
@@ -118,7 +116,7 @@ final class RestOverlaySnapshotTests: XCTestCase {
 
         for theme in ReminderTheme.allCases {
             for state in states {
-                let data = try render(
+                let data = try await render(
                     presentation: state.presentation,
                     theme: theme,
                     size: size,
@@ -131,14 +129,14 @@ final class RestOverlaySnapshotTests: XCTestCase {
                         to: outputDirectory.appendingPathComponent(
                             "\(theme.rawValue)-\(state.name)-1440x900.png"
                         ),
-                        options: .atomic
+                        options: []
                     )
                 }
             }
         }
     }
 
-    func testEveryThemeRendersAtWideAndTallAcceptanceViewports() throws {
+    func testEveryThemeRendersAtWideAndTallAcceptanceViewports() async throws {
         let viewports = [
             Viewport(name: "1470x956", size: CGSize(width: 1470, height: 956)),
             Viewport(name: "2560x1080", size: CGSize(width: 2560, height: 1080))
@@ -170,7 +168,7 @@ final class RestOverlaySnapshotTests: XCTestCase {
         for theme in ReminderTheme.allCases {
             for viewport in viewports {
                 for state in states {
-                    let data = try render(
+                    let data = try await render(
                         presentation: state.presentation,
                         theme: theme,
                         size: viewport.size,
@@ -187,7 +185,7 @@ final class RestOverlaySnapshotTests: XCTestCase {
                             to: outputDirectory.appendingPathComponent(
                                 "\(theme.rawValue)-\(state.name)-\(viewport.name).png"
                             ),
-                            options: .atomic
+                            options: []
                         )
                     }
                 }
@@ -195,7 +193,7 @@ final class RestOverlaySnapshotTests: XCTestCase {
         }
     }
 
-    func testExtremeFatigueAndAccessibilityModesRenderWithoutClipping() throws {
+    func testExtremeFatigueAndAccessibilityModesRenderWithoutClipping() async throws {
         let extreme = RestOverlayPresentation(
             mode: .decision,
             fatigueDisplay: "1.2k%",
@@ -212,13 +210,13 @@ final class RestOverlaySnapshotTests: XCTestCase {
         )
         let outputDirectory = screenshotOutputDirectory()
 
-        let reducedTransparency = try render(
+        let reducedTransparency = try await render(
             presentation: extreme,
             size: CGSize(width: 1440, height: 900),
             reduceMotion: false,
             reduceTransparency: true
         )
-        let reducedMotion = try render(
+        let reducedMotion = try await render(
             presentation: resting,
             size: CGSize(width: 1440, height: 900),
             reduceMotion: true,
@@ -231,11 +229,11 @@ final class RestOverlaySnapshotTests: XCTestCase {
         if let outputDirectory {
             try reducedTransparency.write(
                 to: outputDirectory.appendingPathComponent("decision-1.2k-reduce-transparency.png"),
-                options: .atomic
+                options: []
             )
             try reducedMotion.write(
                 to: outputDirectory.appendingPathComponent("rest-middle-reduce-motion.png"),
-                options: .atomic
+                options: []
             )
         }
     }
@@ -246,32 +244,100 @@ final class RestOverlaySnapshotTests: XCTestCase {
         size: CGSize,
         reduceMotion: Bool,
         reduceTransparency: Bool
-    ) throws -> Data {
-        let scene = RestOverlayScene(
-            presentation: presentation,
-            theme: theme,
-            onBeginRest: {},
-            onContinueWorking: {},
-            reduceMotionOverride: reduceMotion,
-            reduceTransparencyOverride: reduceTransparency
+    ) async throws -> Data {
+        let maximumPixelDimension = backgroundMaximumPixelDimension(for: size)
+        let backgroundLease = RestBackgroundImageLoader.shared.lease(
+            for: theme,
+            maximumPixelDimension: maximumPixelDimension
         )
-        .environment(\.locale, Locale(identifier: "zh-Hans"))
-        .environment(\.colorScheme, .dark)
-        .transaction { transaction in
-            transaction.disablesAnimations = true
+        let rawBackground = try await waitForBackgroundImage(backgroundLease)
+
+        XCTAssertEqual(rawBackground.width, maximumPixelDimension)
+        XCTAssertEqual(
+            Double(rawBackground.width) / Double(rawBackground.height),
+            1.6,
+            accuracy: 0.003
+        )
+        XCTAssertGreaterThan(
+            try sampledColorCount(in: rawBackground),
+            8,
+            "Expected decoded raw background pixels for \(theme.rawValue), not fallback"
+        )
+
+        return try withExtendedLifetime(backgroundLease) {
+            try autoreleasepool {
+                let scene = RestOverlayScene(
+                    presentation: presentation,
+                    theme: theme,
+                    onBeginRest: {},
+                    onContinueWorking: {},
+                    reduceMotionOverride: reduceMotion,
+                    reduceTransparencyOverride: reduceTransparency,
+                    backgroundMaximumPixelDimensionOverride: maximumPixelDimension
+                )
+                .environment(\.locale, Locale(identifier: "zh-Hans"))
+                .environment(\.colorScheme, .dark)
+                .transaction { transaction in
+                    transaction.disablesAnimations = true
+                }
+                .frame(width: size.width, height: size.height)
+
+                let renderer = ImageRenderer(content: scene)
+                renderer.proposedSize = ProposedViewSize(size)
+                renderer.scale = 1
+
+                let image: NSImage = try XCTUnwrap(renderer.nsImage)
+                let tiff: Data = try XCTUnwrap(image.tiffRepresentation)
+                let bitmap: NSBitmapImageRep = try XCTUnwrap(NSBitmapImageRep(data: tiff))
+                return try XCTUnwrap(
+                    bitmap.representation(
+                        using: NSBitmapImageRep.FileType.png,
+                        properties: [:]
+                    )
+                )
+            }
         }
-        .frame(width: size.width, height: size.height)
+    }
 
-        let renderer = ImageRenderer(content: scene)
-        renderer.proposedSize = ProposedViewSize(size)
-        renderer.scale = 1
+    private func backgroundMaximumPixelDimension(for viewport: CGSize) -> Int {
+        let aspectFillHeight = viewport.height * 1.6
+        return min(3072, max(1, Int(ceil(max(viewport.width, aspectFillHeight)))))
+    }
 
-        let image: NSImage = try XCTUnwrap(renderer.nsImage)
-        let tiff: Data = try XCTUnwrap(image.tiffRepresentation)
-        let bitmap: NSBitmapImageRep = try XCTUnwrap(NSBitmapImageRep(data: tiff))
-        return try XCTUnwrap(
-            bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:])
-        )
+    private func waitForBackgroundImage(
+        _ lease: RestBackgroundImageLease,
+        timeout: TimeInterval = 5
+    ) async throws -> CGImage {
+        let deadline = Date().addingTimeInterval(timeout)
+        while lease.image == nil {
+            guard Date() < deadline else {
+                throw SnapshotBackgroundError.timedOut
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        return try XCTUnwrap(lease.image)
+    }
+
+    private func sampledColorCount(in image: CGImage) throws -> Int {
+        let width = 12
+        let height = 8
+        var pixels = [UInt32](repeating: 0, count: width * height)
+
+        try pixels.withUnsafeMutableBytes { buffer in
+            let context = try XCTUnwrap(CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * MemoryLayout<UInt32>.size,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            context.interpolationQuality = .low
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+
+        return Set(pixels).count
     }
 
     private func screenshotOutputDirectory() -> URL? {
@@ -285,4 +351,8 @@ final class RestOverlaySnapshotTests: XCTestCase {
         )
         return url
     }
+}
+
+private enum SnapshotBackgroundError: Error {
+    case timedOut
 }

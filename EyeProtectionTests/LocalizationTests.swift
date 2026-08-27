@@ -35,6 +35,53 @@ final class LocalizationTests: XCTestCase {
         XCTAssertTrue(Preferences.onboardingCompleted)
     }
 
+    func testOnboardingPrimaryActionRequiresRunningMonitoringBeforeCompletion() {
+        let unauthorized = OnboardingPermissionPhase(
+            inputPermissionGranted: false,
+            isMonitoringComplete: false
+        )
+        XCTAssertEqual(unauthorized, .authorizationRequired)
+        XCTAssertEqual(unauthorized.primaryAction, .authorize)
+
+        let starting = OnboardingPermissionPhase(
+            inputPermissionGranted: true,
+            isMonitoringComplete: false
+        )
+        XCTAssertEqual(starting, .starting)
+        XCTAssertEqual(starting.primaryAction, .recheck)
+
+        let ready = OnboardingPermissionPhase(
+            inputPermissionGranted: true,
+            isMonitoringComplete: true
+        )
+        XCTAssertEqual(ready, .ready)
+        XCTAssertEqual(ready.primaryAction, .complete)
+    }
+
+    func testMonitoringRecheckFeedbackDistinguishesPermissionAndRuntimeFailures() {
+        XCTAssertEqual(
+            MonitoringRecheckFeedback(
+                inputPermissionGranted: false,
+                isMonitoringComplete: false
+            ),
+            .permissionRequired
+        )
+        XCTAssertEqual(
+            MonitoringRecheckFeedback(
+                inputPermissionGranted: true,
+                isMonitoringComplete: false
+            ),
+            .unavailable
+        )
+        XCTAssertEqual(
+            MonitoringRecheckFeedback(
+                inputPermissionGranted: true,
+                isMonitoringComplete: true
+            ),
+            .running
+        )
+    }
+
     func testSystemLanguageResolutionUsesOnlySupportedLocalizations() {
         XCTAssertEqual(
             AppLanguage.system.resolved(preferredLanguages: ["zh-Hans-CN"]),
@@ -87,6 +134,19 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(ReminderMode.fullScreen.displayName, "全屏提醒")
         XCTAssertEqual(ReminderTheme.forestLight.displayName(language: .english), "Forest Light")
         XCTAssertEqual(ReminderTheme.forestLight.displayName, "林间天光")
+        XCTAssertEqual(
+            ReminderTheme.mossGardenRain.displayName(language: .english),
+            "Moss Garden Rain"
+        )
+        XCTAssertEqual(ReminderTheme.mossGardenRain.displayName, "苔庭细雨")
+        XCTAssertEqual(
+            ReminderTheme.rainwashedSeaCliff.description(language: .zhHans),
+            "雨后的海崖与薄雾打开远眺空间，清透而舒展。"
+        )
+        XCTAssertEqual(
+            ReminderTheme.cloudfieldWind.displayName(language: .english),
+            "Cloudfield Wind"
+        )
         XCTAssertEqual(ReminderDecisionAction.deferRest.title(language: .english), "Not Now")
         XCTAssertEqual(ReminderDecisionAction.deferRest.title, "暂不休息")
     }
@@ -137,5 +197,12 @@ final class LocalizationTests: XCTestCase {
             format: nil
         )
         return try XCTUnwrap(propertyList as? [String: String])
+    }
+}
+
+final class OnboardingWindowPolicyTests: XCTestCase {
+    func testWindowCannotCloseBeforeMonitoringOnboardingCompletes() {
+        XCTAssertFalse(OnboardingWindowPolicy.canClose(onboardingCompleted: false))
+        XCTAssertTrue(OnboardingWindowPolicy.canClose(onboardingCompleted: true))
     }
 }

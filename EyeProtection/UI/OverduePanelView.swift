@@ -145,15 +145,24 @@ private struct OverduePanelBackground: View {
                     )
                 )
 
-            Image(theme.previewAssetName)
-                .resizable()
-                .scaledToFill()
-                .saturation(0.68)
-                .contrast(0.86)
-                .opacity(reduceTransparency ? 0.10 : 0.18)
-                .overlay(theme.style.backdrop.opacity(0.46))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
+            GeometryReader { proxy in
+                Image(theme.previewAssetName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
+                        alignment: treatment.imageAlignment
+                    )
+                    .saturation(treatment.saturation)
+                    .contrast(treatment.contrast)
+                    .brightness(treatment.brightness)
+                    .clipped()
+                    .opacity(
+                        treatment.imageOpacity * (reduceTransparency ? 0.16 : 0.28)
+                    )
+                    .overlay(theme.style.backdrop.opacity(0.46))
+            }
 
             if !reduceTransparency {
                 LinearGradient(
@@ -210,6 +219,10 @@ private struct OverduePanelBackground: View {
         .shadow(color: .black.opacity(0.18), radius: 3, y: 2)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private var treatment: MenuThemeBackdropTreatment {
+        theme.menuBackdropTreatment
     }
 }
 

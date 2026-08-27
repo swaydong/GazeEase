@@ -1,4 +1,5 @@
 import AppKit
+import Charts
 import SwiftUI
 
 enum EyePalette {
@@ -34,7 +35,10 @@ struct MenuContentPresentation: Equatable {
     let isMonitoringComplete: Bool
     let restSecondsRemaining: TimeInterval
     let theme: ReminderTheme
+    var inputPermissionGranted: Bool = true
     var language: AppLanguage = .zhHans
+    var todayOverview: MenuTodayOverviewSummary = .empty
+    var todayFatigue: MenuTodayFatigueSummary = .empty
 
     var fatigueProgress: Double {
         min(max(fatigue / 100, 0), 1)
@@ -57,12 +61,202 @@ struct MenuContentPresentation: Equatable {
             arguments: [fatigueDisplay]
         )
     }
+
+    var todayOverviewAccessibilityLabel: String {
+        todayOverview.overloadDisplay(language: language)
+            + " "
+            + todayFatigue.accessibilityLabel(language: language)
+    }
+
+    var monitoringIssueKey: L10nKey {
+        inputPermissionGranted
+            ? .menuMonitoringUnavailable
+            : .menuMonitoringPermissionRequired
+    }
+}
+
+struct MenuTodayFatiguePoint: Identifiable, Equatable {
+    let timestamp: Date
+    let fatigue: Double
+
+    var id: Date { timestamp }
+}
+
+struct MenuTodayFatigueSummary: Equatable {
+    static let maximumVisualPointCount = 96
+
+    let points: [MenuTodayFatiguePoint]
+    let visualPoints: [MenuTodayFatiguePoint]
+    let currentFatigue: Double
+
+    static let empty = MenuTodayFatigueSummary(points: [], currentFatigue: 0)
+
+    init(
+        points: [MenuTodayFatiguePoint],
+        currentFatigue: Double,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        let startOfDay = calendar.startOfDay(for: now)
+        let normalizedCurrent = currentFatigue.isFinite ? max(0, currentFatigue) : 0
+        let sorted = points
+            .filter {
+                $0.timestamp >= startOfDay
+                    && $0.timestamp <= now
+                    && $0.fatigue.isFinite
+            }
+            .map {
+                MenuTodayFatiguePoint(
+                    timestamp: $0.timestamp,
+                    fatigue: max(0, $0.fatigue)
+                )
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        var normalized: [MenuTodayFatiguePoint] = []
+        for point in sorted {
+            if normalized.last?.timestamp == point.timestamp {
+                normalized[normalized.count - 1] = point
+            } else {
+                normalized.append(point)
+            }
+        }
+
+        if !normalized.isEmpty || normalizedCurrent > 0 {
+            let livePoint = MenuTodayFatiguePoint(
+                timestamp: now,
+                fatigue: normalizedCurrent
+            )
+            if normalized.last?.timestamp == now {
+                normalized[normalized.count - 1] = livePoint
+            } else {
+                normalized.append(livePoint)
+            }
+        }
+
+        self.points = normalized
+        self.visualPoints = Self.makeVisualPoints(normalized)
+        self.currentFatigue = normalizedCurrent
+    }
+
+    private static func makeVisualPoints(
+        _ points: [MenuTodayFatiguePoint]
+    ) -> [MenuTodayFatiguePoint] {
+        guard points.count > maximumVisualPointCount else { return points }
+
+        let first = points[0]
+        let last = points[points.count - 1]
+        let interior = points.dropFirst().dropLast()
+        let bucketCount = (maximumVisualPointCount - 2) / 2
+        var sampled = [first]
+        sampled.reserveCapacity(maximumVisualPointCount)
+
+        for bucketIndex in 0..<bucketCount {
+            let lowerBound = interior.startIndex
+                + bucketIndex * interior.count / bucketCount
+            let upperBound = interior.startIndex
+                + (bucketIndex + 1) * interior.count / bucketCount
+            let bucket = interior[lowerBound..<upperBound]
+            guard let latest = bucket.last else { continue }
+
+            let peak = bucket.max { left, right in
+                left.fatigue < right.fatigue
+            } ?? latest
+            if peak.timestamp < latest.timestamp {
+                sampled.append(peak)
+                sampled.append(latest)
+            } else if peak.timestamp > latest.timestamp {
+                sampled.append(latest)
+                sampled.append(peak)
+            } else {
+                sampled.append(latest)
+            }
+        }
+
+        sampled.append(last)
+        return sampled
+    }
+
+    var peakFatigue: Double {
+        points.map(\.fatigue).max() ?? currentFatigue
+    }
+
+    var upperBound: Double {
+        max(120, ceil(max(100, peakFatigue * 1.08) / 20) * 20)
+    }
+
+    func peakDisplay(language: AppLanguage) -> String {
+        AppLocalization.format(
+            .menuTodayFatiguePeak,
+            language: language,
+            arguments: [FatigueValueFormatter.display(peakFatigue)]
+        )
+    }
+
+    func accessibilityLabel(language: AppLanguage) -> String {
+        AppLocalization.format(
+            .menuTodayFatigueAccessibility,
+            language: language,
+            arguments: [
+                points.count,
+                FatigueValueFormatter.display(peakFatigue),
+                FatigueValueFormatter.display(currentFatigue)
+            ]
+        )
+    }
+}
+
+struct MenuTodayOverviewSummary: Equatable {
+    let overloadDuration: TimeInterval
+
+    static let empty = MenuTodayOverviewSummary(overloadDuration: 0)
+
+    func overloadDisplay(language: AppLanguage) -> String {
+        guard overloadDuration > 0 else {
+            return AppLocalization.string(
+                .menuTodayOverviewOverloadClear,
+                language: language
+            )
+        }
+        return AppLocalization.format(
+            .menuTodayOverviewOverload,
+            language: language,
+            arguments: [EyeDurationFormatter.compact(overloadDuration, language: language)]
+        )
+    }
+}
+
+enum MenuRefreshPolicy {
+    static let visibleRefreshInterval: TimeInterval = 20
+
+    static func shouldRun(isMenuVisible: Bool) -> Bool {
+        isMenuVisible
+    }
+}
+
+enum MenuHostWindowVisibilityPolicy {
+    static func isVisible(
+        isWindowVisible: Bool,
+        isKeyWindow: Bool
+    ) -> Bool {
+        isWindowVisible && isKeyWindow
+    }
+
+    static func isEventForHostWindow(
+        eventWindow: NSWindow?,
+        hostWindow: NSWindow?
+    ) -> Bool {
+        guard let eventWindow, let hostWindow else { return false }
+        return eventWindow === hostWindow
+    }
 }
 
 struct MenuContentView: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @State private var todayFatigue = MenuTodayFatigueSummary.empty
+    @State private var isMenuVisible = false
 
     var body: some View {
         MenuContentScene(
@@ -76,7 +270,12 @@ struct MenuContentView: View {
                 isMonitoringComplete: model.isMonitoringComplete,
                 restSecondsRemaining: model.restSecondsRemaining,
                 theme: model.reminderTheme,
-                language: model.resolvedLanguage
+                inputPermissionGranted: model.inputPermissionGranted,
+                language: model.resolvedLanguage,
+                todayOverview: MenuTodayOverviewSummary(
+                    overloadDuration: model.analytics.today.overloadDuration
+                ),
+                todayFatigue: todayFatigue
             ),
             onBeginRest: model.beginRest,
             onOpenAnalytics: {
@@ -88,8 +287,166 @@ struct MenuContentView: View {
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
             },
-            onQuit: model.quit
+            onQuit: model.quit,
+            onRepairMonitoring: {
+                NSApp.activate(ignoringOtherApps: true)
+                model.repairInputMonitoring()
+            }
         )
+        .background {
+            MenuHostWindowVisibilityReader { isVisible in
+                guard isMenuVisible != isVisible else { return }
+                isMenuVisible = isVisible
+            }
+            .accessibilityHidden(true)
+        }
+        .task(id: isMenuVisible) {
+            guard MenuRefreshPolicy.shouldRun(isMenuVisible: isMenuVisible) else {
+                return
+            }
+            refreshTodayFatigue()
+            do {
+                try await Task.sleep(for: .milliseconds(120))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            model.refreshAnalyticsIfNeeded()
+            refreshTodayFatigue()
+
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(
+                        for: .seconds(MenuRefreshPolicy.visibleRefreshInterval)
+                    )
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                model.refreshAnalyticsIfNeeded()
+                refreshTodayFatigue()
+            }
+        }
+    }
+
+    private func refreshTodayFatigue(at now: Date = Date()) {
+        let updatedSummary = MenuTodayFatigueSummary(
+            points: model.analytics.fatiguePoints.map {
+                MenuTodayFatiguePoint(
+                    timestamp: $0.timestamp,
+                    fatigue: $0.fatigue
+                )
+            },
+            currentFatigue: model.fatigue,
+            now: now
+        )
+        guard todayFatigue != updatedSummary else { return }
+        todayFatigue = updatedSummary
+    }
+}
+
+private struct MenuHostWindowVisibilityReader: NSViewRepresentable {
+    let onVisibilityChange: (Bool) -> Void
+
+    func makeNSView(context: Context) -> MenuHostWindowVisibilityProbeView {
+        let view = MenuHostWindowVisibilityProbeView()
+        view.onVisibilityChange = onVisibilityChange
+        return view
+    }
+
+    func updateNSView(
+        _ nsView: MenuHostWindowVisibilityProbeView,
+        context: Context
+    ) {
+        nsView.onVisibilityChange = onVisibilityChange
+        nsView.publishCurrentVisibility()
+    }
+
+    static func dismantleNSView(
+        _ nsView: MenuHostWindowVisibilityProbeView,
+        coordinator: Void
+    ) {
+        nsView.stopObservingWindow()
+    }
+}
+
+@MainActor
+private final class MenuHostWindowVisibilityProbeView: NSView {
+    var onVisibilityChange: ((Bool) -> Void)?
+
+    private weak var observedWindow: NSWindow?
+    private var lastPublishedVisibility: Bool?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observe(window)
+    }
+
+    func publishCurrentVisibility() {
+        let isVisible = observedWindow.map {
+            MenuHostWindowVisibilityPolicy.isVisible(
+                isWindowVisible: $0.isVisible,
+                isKeyWindow: $0.isKeyWindow
+            )
+        } ?? false
+        guard lastPublishedVisibility != isVisible else { return }
+        lastPublishedVisibility = isVisible
+        onVisibilityChange?(isVisible)
+    }
+
+    func stopObservingWindow() {
+        NotificationCenter.default.removeObserver(self)
+        observedWindow = nil
+        lastPublishedVisibility = nil
+    }
+
+    private func observe(_ window: NSWindow?) {
+        guard observedWindow !== window else {
+            publishCurrentVisibility()
+            return
+        }
+
+        stopObservingWindow()
+        observedWindow = window
+        guard let window else {
+            publishCurrentVisibility()
+            return
+        }
+
+        let notificationCenter = NotificationCenter.default
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(windowVisibilityDidChange(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: window
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(windowVisibilityDidChange(_:)),
+            name: NSWindow.didResignKeyNotification,
+            object: window
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(windowVisibilityDidChange(_:)),
+            name: NSWindow.didChangeOcclusionStateNotification,
+            object: window
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(windowVisibilityDidChange(_:)),
+            name: NSWindow.willCloseNotification,
+            object: window
+        )
+        publishCurrentVisibility()
+    }
+
+    @objc private func windowVisibilityDidChange(_ notification: Notification) {
+        guard MenuHostWindowVisibilityPolicy.isEventForHostWindow(
+            eventWindow: notification.object as? NSWindow,
+            hostWindow: observedWindow
+        ) else { return }
+        publishCurrentVisibility()
     }
 }
 
@@ -101,6 +458,7 @@ struct MenuContentScene: View {
     let onOpenAnalytics: () -> Void
     let onOpenSettings: () -> Void
     let onQuit: () -> Void
+    var onRepairMonitoring: () -> Void = {}
     var reduceTransparencyOverride: Bool? = nil
 
     var body: some View {
@@ -133,8 +491,11 @@ struct MenuContentScene: View {
                         ? localized(.menuActionBeginRestHintRequired)
                         : localized(.menuActionBeginRestHintOptional)
                 )
+
+                todayOverview
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
 
             themedDivider
 
@@ -164,7 +525,7 @@ struct MenuContentScene: View {
             .padding(6)
         }
         .frame(width: 320)
-        .frame(minHeight: 300, alignment: .top)
+        .frame(minHeight: 425, alignment: .top)
         .background {
             MenuContentBackground(
                 theme: presentation.theme,
@@ -203,6 +564,7 @@ struct MenuContentScene: View {
                     .frame(width: 20, height: 20)
             }
             .frame(width: 58, height: 58)
+            .fixedSize()
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -214,6 +576,7 @@ struct MenuContentScene: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white.opacity(effectiveReduceTransparency ? 0.78 : 0.64))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.78)
 
                 Text(presentation.fatigueDisplay)
                     .font(.system(size: 31, weight: .bold, design: .rounded))
@@ -234,12 +597,13 @@ struct MenuContentScene: View {
                         .font(.caption.weight(.medium))
                         .foregroundStyle(presentation.theme.style.accent.opacity(0.92))
                         .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                 }
             }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(presentation.headerAccessibilityLabel)
     }
@@ -255,12 +619,19 @@ struct MenuContentScene: View {
                 .frame(width: 7, height: 7)
                 .accessibilityHidden(true)
 
-            Text(
-                presentation.isResting
-                    ? localized(.menuResting)
-                    : presentation.presenceDescription
-            )
-            .lineLimit(1)
+            if !presentation.isResting, !presentation.isMonitoringComplete {
+                Text(localized(presentation.monitoringIssueKey))
+                    .foregroundStyle(EyePalette.watch)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            } else {
+                Text(
+                    presentation.isResting
+                        ? localized(.menuResting)
+                        : presentation.presenceDescription
+                )
+                .lineLimit(1)
+            }
 
             Spacer(minLength: 8)
 
@@ -274,13 +645,92 @@ struct MenuContentScene: View {
                     .foregroundStyle(.white.opacity(0.62))
                     .lineLimit(1)
             } else if !presentation.isMonitoringComplete {
-                Text(localized(.menuMonitoringIncomplete))
+                Button(localized(.menuMonitoringRepair), action: onRepairMonitoring)
+                    .buttonStyle(.plain)
+                    .fontWeight(.semibold)
                     .foregroundStyle(EyePalette.watch)
                     .lineLimit(1)
+                    .accessibilityHint(localized(.menuMonitoringRepairAccessibilityHint))
             }
         }
         .font(.caption)
         .foregroundStyle(.white.opacity(effectiveReduceTransparency ? 0.86 : 0.72))
+    }
+
+    private var todayOverview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "sun.horizon.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(presentation.theme.style.accentHighlight)
+                    .accessibilityHidden(true)
+
+                Text(localized(.menuTodayOverviewTitle))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                Spacer(minLength: 8)
+
+                Text(presentation.todayOverview.overloadDisplay(
+                    language: presentation.language
+                ))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(presentation.theme.style.accentHighlight)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .layoutPriority(1)
+            }
+
+            HStack(spacing: 8) {
+                Text(localized(.analyticsChartTitle))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(
+                        effectiveReduceTransparency ? 0.82 : 0.66
+                    ))
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Text(presentation.todayFatigue.peakDisplay(
+                    language: presentation.language
+                ))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(presentation.theme.style.accentHighlight)
+                    .lineLimit(1)
+            }
+
+            MenuTodayFatigueChart(
+                summary: presentation.todayFatigue,
+                theme: presentation.theme,
+                language: presentation.language,
+                reduceTransparency: effectiveReduceTransparency
+            )
+            .equatable()
+            .frame(height: 58)
+            .accessibilityHidden(true)
+
+        }
+        .padding(11)
+        .background {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(presentation.theme.style.surface.opacity(
+                    effectiveReduceTransparency ? 1 : 0.72
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(
+                    presentation.theme.style.accent.opacity(
+                        effectiveReduceTransparency ? 0.48 : 0.28
+                    ),
+                    lineWidth: 1
+                )
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(presentation.todayOverviewAccessibilityLabel)
     }
 
     private var themedDivider: some View {
@@ -300,6 +750,81 @@ struct MenuContentScene: View {
 
     private func localized(_ key: L10nKey) -> String {
         AppLocalization.string(key, language: presentation.language)
+    }
+}
+
+private struct MenuTodayFatigueChart: View, Equatable {
+    let summary: MenuTodayFatigueSummary
+    let theme: ReminderTheme
+    let language: AppLanguage
+    let reduceTransparency: Bool
+
+    var body: some View {
+        let style = theme.style
+        Group {
+            if summary.visualPoints.isEmpty {
+                Text(AppLocalization.string(
+                    .analyticsChartEmptyTitle,
+                    language: language
+                ))
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(reduceTransparency ? 0.80 : 0.60))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Chart {
+                    ForEach(summary.visualPoints) { point in
+                        AreaMark(
+                            x: .value("Time", point.timestamp),
+                            yStart: .value("Threshold", 100),
+                            yEnd: .value("Overload", max(100, point.fatigue))
+                        )
+                        .foregroundStyle(style.accent.opacity(
+                            reduceTransparency ? 0.30 : 0.18
+                        ))
+
+                        if summary.visualPoints.count > 1 {
+                            LineMark(
+                                x: .value("Time", point.timestamp),
+                                y: .value("Fatigue", point.fatigue)
+                            )
+                            .foregroundStyle(style.accentHighlight)
+                            .lineStyle(StrokeStyle(
+                                lineWidth: 2,
+                                lineCap: .round,
+                                lineJoin: .round
+                            ))
+                            .interpolationMethod(.linear)
+                        }
+                    }
+
+                    RuleMark(y: .value("Rest Threshold", 100))
+                        .foregroundStyle(style.accent.opacity(
+                            reduceTransparency ? 0.82 : 0.52
+                        ))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .annotation(position: .top, alignment: .leading) {
+                            Text("100%")
+                                .font(.system(size: 8, weight: .medium, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(.white.opacity(
+                                    reduceTransparency ? 0.78 : 0.54
+                                ))
+                        }
+
+                    if let current = summary.visualPoints.last {
+                        PointMark(
+                            x: .value("Current Time", current.timestamp),
+                            y: .value("Current Fatigue", current.fatigue)
+                        )
+                        .foregroundStyle(style.accentHighlight)
+                        .symbolSize(22)
+                    }
+                }
+                .chartYScale(domain: 0...summary.upperBound)
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+            }
+        }
     }
 }
 
@@ -450,6 +975,71 @@ extension ReminderTheme {
                 lightCenter: .bottomTrailing,
                 lightOpacity: 0.23,
                 lightRadius: 164
+            )
+        case .mossGardenRain:
+            MenuThemeBackdropTreatment(
+                imageAlignment: .bottom,
+                imageOpacity: 0.66,
+                saturation: 0.72,
+                contrast: 1.12,
+                brightness: -0.04,
+                topWashOpacity: 0.34,
+                bottomWashOpacity: 0.58,
+                lightCenter: .bottom,
+                lightOpacity: 0.16,
+                lightRadius: 160
+            )
+        case .polarNightGlow:
+            MenuThemeBackdropTreatment(
+                imageAlignment: .bottom,
+                imageOpacity: 0.64,
+                saturation: 0.70,
+                contrast: 1.15,
+                brightness: -0.05,
+                topWashOpacity: 0.30,
+                bottomWashOpacity: 0.56,
+                lightCenter: .bottom,
+                lightOpacity: 0.20,
+                lightRadius: 180
+            )
+        case .moonlitBamboo:
+            MenuThemeBackdropTreatment(
+                imageAlignment: .top,
+                imageOpacity: 0.70,
+                saturation: 0.78,
+                contrast: 1.16,
+                brightness: -0.04,
+                topWashOpacity: 0.26,
+                bottomWashOpacity: 0.56,
+                lightCenter: .top,
+                lightOpacity: 0.18,
+                lightRadius: 150
+            )
+        case .rainwashedSeaCliff:
+            MenuThemeBackdropTreatment(
+                imageAlignment: .bottom,
+                imageOpacity: 0.58,
+                saturation: 0.74,
+                contrast: 1.14,
+                brightness: -0.08,
+                topWashOpacity: 0.42,
+                bottomWashOpacity: 0.60,
+                lightCenter: .bottom,
+                lightOpacity: 0.12,
+                lightRadius: 174
+            )
+        case .cloudfieldWind:
+            MenuThemeBackdropTreatment(
+                imageAlignment: .bottom,
+                imageOpacity: 0.62,
+                saturation: 0.66,
+                contrast: 1.10,
+                brightness: -0.05,
+                topWashOpacity: 0.30,
+                bottomWashOpacity: 0.58,
+                lightCenter: .bottom,
+                lightOpacity: 0.15,
+                lightRadius: 168
             )
         }
     }

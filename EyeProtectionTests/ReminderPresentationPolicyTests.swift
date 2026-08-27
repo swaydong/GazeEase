@@ -19,6 +19,7 @@ final class ReminderPresentationPolicyTests: XCTestCase {
         XCTAssertNil(ReminderPresentationPolicy.overlay(
             restRequired: true,
             isResting: false,
+            activeRestTrigger: nil,
             promptState: .initialDecision,
             reminderMode: .systemNotification
         ))
@@ -38,6 +39,7 @@ final class ReminderPresentationPolicyTests: XCTestCase {
         XCTAssertNil(ReminderPresentationPolicy.overlay(
             restRequired: true,
             isResting: false,
+            activeRestTrigger: nil,
             promptState: .initialDecision,
             reminderMode: .topPanel
         ))
@@ -53,6 +55,7 @@ final class ReminderPresentationPolicyTests: XCTestCase {
         XCTAssertEqual(ReminderPresentationPolicy.overlay(
             restRequired: true,
             isResting: false,
+            activeRestTrigger: nil,
             promptState: .initialDecision,
             reminderMode: .fullScreen
         ), .decision)
@@ -69,6 +72,7 @@ final class ReminderPresentationPolicyTests: XCTestCase {
             XCTAssertNil(ReminderPresentationPolicy.overlay(
                 restRequired: true,
                 isResting: false,
+                activeRestTrigger: nil,
                 promptState: .hidden,
                 reminderMode: mode
             ))
@@ -87,13 +91,14 @@ final class ReminderPresentationPolicyTests: XCTestCase {
             XCTAssertNil(ReminderPresentationPolicy.overlay(
                 restRequired: true,
                 isResting: false,
+                activeRestTrigger: nil,
                 promptState: .manualRetry,
                 reminderMode: mode
             ))
         }
     }
 
-    func testRestingHidesPromptAndShowsRestOverlay() {
+    func testManualRestingHidesPromptAndShowsRestOverlay() {
         for mode in ReminderMode.allCases {
             XCTAssertNil(ReminderPresentationPolicy.panel(
                 restRequired: true,
@@ -104,9 +109,82 @@ final class ReminderPresentationPolicyTests: XCTestCase {
             XCTAssertEqual(ReminderPresentationPolicy.overlay(
                 restRequired: true,
                 isResting: true,
+                activeRestTrigger: .manual,
                 promptState: .hidden,
                 reminderMode: mode
             ), .resting)
+        }
+    }
+
+    func testSystemRestingNeverShowsFullScreenOverlay() {
+        for trigger in [
+            RestTrigger.screenLocked,
+            .displayAsleep,
+            .systemSleep,
+        ] {
+            for mode in ReminderMode.allCases {
+                XCTAssertNil(ReminderPresentationPolicy.panel(
+                    restRequired: true,
+                    isResting: true,
+                    promptState: .initialDecision,
+                    reminderMode: mode
+                ))
+                XCTAssertNil(ReminderPresentationPolicy.overlay(
+                    restRequired: true,
+                    isResting: true,
+                    activeRestTrigger: trigger,
+                    promptState: .initialDecision,
+                    reminderMode: mode
+                ))
+            }
+        }
+    }
+
+    func testShortSystemRestRestoresUnresolvedTopPanelReminder() throws {
+        let rest = ActiveRestSession(
+            trigger: .screenLocked,
+            startedAt: Date(timeIntervalSince1970: 1_000),
+            startFatiguePercent: 120
+        )
+        var promptState = ReminderPromptState.initialDecision.applying(.restStarted(rest))
+
+        XCTAssertNil(ReminderPresentationPolicy.overlay(
+            restRequired: true,
+            isResting: true,
+            activeRestTrigger: .screenLocked,
+            promptState: promptState,
+            reminderMode: .topPanel
+        ))
+
+        let interruptedAttempt = RestAttempt(
+            id: rest.id,
+            trigger: .screenLocked,
+            startedAt: rest.startedAt,
+            endedAt: rest.startedAt.addingTimeInterval(10),
+            startFatiguePercent: 120,
+            duration: 10,
+            endFatiguePercent: 60,
+            outcome: .interrupted(.cancelled)
+        )
+        promptState = RestRuntimePolicy.promptStateAfterInterruptedSystemRest(
+            restRequired: true
+        )
+        promptState = promptState.applying(.restInterrupted(interruptedAttempt))
+
+        for mode in ReminderMode.allCases {
+            XCTAssertNotNil(ReminderPresentationPolicy.panel(
+                restRequired: true,
+                isResting: false,
+                promptState: promptState,
+                reminderMode: mode
+            ))
+            XCTAssertNil(ReminderPresentationPolicy.overlay(
+                restRequired: true,
+                isResting: false,
+                activeRestTrigger: nil,
+                promptState: promptState,
+                reminderMode: mode
+            ))
         }
     }
 
@@ -119,6 +197,45 @@ final class ReminderPresentationPolicyTests: XCTestCase {
         XCTAssertEqual(ReminderMode.restored(fromPersistedValue: "fullScreen"), .fullScreen)
         XCTAssertEqual(ReminderMode.restored(fromPersistedValue: nil), .topPanel)
         XCTAssertEqual(ReminderMode.restored(fromPersistedValue: "unknown"), .topPanel)
+    }
+}
+
+final class ReminderPreviewPolicyTests: XCTestCase {
+    func testPreviewRetiresForAnyRealRestState() {
+        XCTAssertFalse(ReminderPreviewPolicy.shouldDismissForRealState(
+            restRequired: false,
+            isResting: false
+        ))
+        XCTAssertTrue(ReminderPreviewPolicy.shouldDismissForRealState(
+            restRequired: true,
+            isResting: false
+        ))
+        XCTAssertTrue(ReminderPreviewPolicy.shouldDismissForRealState(
+            restRequired: false,
+            isResting: true
+        ))
+    }
+}
+
+final class ReminderPanelContentPolicyTests: XCTestCase {
+    func testStableRealPanelKeepsItsContentUntilInvalidated() {
+        let presentation = ReminderPanelPresentation()
+
+        XCTAssertFalse(ReminderPanelContentPolicy.shouldReplace(
+            hasContent: true,
+            current: presentation,
+            updated: presentation
+        ))
+        XCTAssertTrue(ReminderPanelContentPolicy.shouldReplace(
+            hasContent: false,
+            current: presentation,
+            updated: presentation
+        ))
+        XCTAssertTrue(ReminderPanelContentPolicy.shouldReplace(
+            hasContent: true,
+            current: nil,
+            updated: presentation
+        ))
     }
 }
 
@@ -222,6 +339,200 @@ final class ReminderPromptStateTests: XCTestCase {
             duration: 10,
             endFatiguePercent: completed ? 0 : 90,
             outcome: completed ? .completed : .interrupted(.cancelled)
+        )
+    }
+}
+
+final class RestRuntimePolicyTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_000)
+
+    func testRestoringInterruptedActiveRestUsesTopPanelRetry() {
+        let runtime = makeRuntime(
+            promptState: .hidden,
+            activeRest: ActiveRestSession(
+                trigger: .manual,
+                startedAt: now,
+                startFatiguePercent: 180,
+                elapsed: 8
+            )
+        )
+
+        XCTAssertEqual(
+            RestRuntimePolicy.restoredPromptState(from: runtime),
+            .manualRetry
+        )
+    }
+
+    func testRestoringHiddenStateWithoutActiveRestPreservesIntentionalDeferral() {
+        XCTAssertEqual(
+            RestRuntimePolicy.restoredPromptState(
+                from: makeRuntime(promptState: .hidden)
+            ),
+            .hidden
+        )
+    }
+
+    func testRestoringLegacyRequiredRestWithoutPromptMetadataShowsDecision() {
+        XCTAssertEqual(
+            RestRuntimePolicy.restoredPromptState(
+                from: makeRuntime(promptState: nil)
+            ),
+            .initialDecision
+        )
+    }
+
+    func testInterruptedActiveRestProducesOneBoundedRecoveryAttempt() throws {
+        let attempt = try XCTUnwrap(
+            RestRuntimePolicy.interruptedAttemptForRecovery(
+                from: makeRuntime(
+                    promptState: .hidden,
+                    activeRest: ActiveRestSession(
+                        trigger: .manual,
+                        startedAt: now,
+                        startFatiguePercent: 180,
+                        elapsed: 8
+                    )
+                )
+            )
+        )
+
+        XCTAssertEqual(attempt.startedAt, now)
+        XCTAssertEqual(attempt.endedAt, now.addingTimeInterval(8))
+        XCTAssertEqual(attempt.duration, 8)
+        XCTAssertEqual(attempt.outcome, .interrupted(.cancelled))
+    }
+
+    func testAwayInputIsIgnoredInsteadOfInterruptingSystemRest() {
+        XCTAssertTrue(RestRuntimePolicy.shouldIgnoreInput(systemAway: true))
+        XCTAssertFalse(RestRuntimePolicy.shouldIgnoreInput(systemAway: false))
+    }
+
+    func testOnlyManualRestRequiresLiveInputMonitoring() {
+        XCTAssertTrue(RestRuntimePolicy.shouldInterruptForUnavailableMonitoring(
+            activeRestTrigger: .manual,
+            inputPermissionGranted: false,
+            inputMonitorRunning: false
+        ))
+        XCTAssertTrue(RestRuntimePolicy.shouldInterruptForUnavailableMonitoring(
+            activeRestTrigger: .manual,
+            inputPermissionGranted: true,
+            inputMonitorRunning: false
+        ))
+
+        for trigger in [
+            RestTrigger.screenLocked,
+            .displayAsleep,
+            .systemSleep,
+        ] {
+            XCTAssertFalse(RestRuntimePolicy.shouldInterruptForUnavailableMonitoring(
+                activeRestTrigger: trigger,
+                inputPermissionGranted: false,
+                inputMonitorRunning: false
+            ))
+        }
+    }
+
+    func testInterruptedSystemRestReturnsToTopPanelEvenInFullScreenMode() {
+        let promptState = RestRuntimePolicy.promptStateAfterInterruptedSystemRest(
+            restRequired: true
+        )
+
+        XCTAssertEqual(promptState, .manualRetry)
+        XCTAssertNotNil(ReminderPresentationPolicy.panel(
+            restRequired: true,
+            isResting: false,
+            promptState: promptState,
+            reminderMode: .fullScreen
+        ))
+        XCTAssertNil(ReminderPresentationPolicy.overlay(
+            restRequired: true,
+            isResting: false,
+            activeRestTrigger: nil,
+            promptState: promptState,
+            reminderMode: .fullScreen
+        ))
+    }
+
+    private func makeRuntime(
+        promptState: ReminderPromptState?,
+        activeRest: ActiveRestSession? = nil
+    ) -> PersistedRuntimeState {
+        PersistedRuntimeState(
+            fatigue: 180,
+            restRequired: true,
+            overloadStartedAt: now.addingTimeInterval(-600),
+            overloadEpisodeID: UUID(),
+            continuousUsageDuration: 2_160,
+            activeRest: activeRest,
+            reminderPromptState: promptState,
+            reminderDecisionPending: promptState.map { $0 != .hidden },
+            savedAt: now
+        )
+    }
+}
+
+final class RestAttemptOutboxPolicyTests: XCTestCase {
+    func testDuplicateAttemptsAreQueuedOnceAndRetryUntilSuccess() {
+        let pendingAttempt = makePendingAttempt(id: UUID())
+        var attempts: [PendingRestAttempt] = []
+
+        RestAttemptOutboxPolicy.enqueue(pendingAttempt, into: &attempts)
+        RestAttemptOutboxPolicy.enqueue(pendingAttempt, into: &attempts)
+        XCTAssertEqual(attempts, [pendingAttempt])
+
+        XCTAssertFalse(RestAttemptOutboxPolicy.drain(&attempts) { _ in false })
+        XCTAssertEqual(attempts, [pendingAttempt])
+        XCTAssertTrue(RestAttemptOutboxPolicy.drain(&attempts) { _ in true })
+        XCTAssertTrue(attempts.isEmpty)
+    }
+
+    func testDrainStopsAtFirstFailureWithoutDroppingLaterAttempts() {
+        let first = makePendingAttempt(id: UUID())
+        let second = makePendingAttempt(id: UUID())
+        var attempts = [first, second]
+        var visited: [UUID] = []
+
+        XCTAssertFalse(RestAttemptOutboxPolicy.drain(&attempts) { pendingAttempt in
+            visited.append(pendingAttempt.id)
+            return false
+        })
+        XCTAssertEqual(visited, [first.id])
+        XCTAssertEqual(attempts, [first, second])
+    }
+
+    func testNormalizationKeepsFirstAttemptForEachStableID() {
+        let id = UUID()
+        let first = makePendingAttempt(id: id)
+        var duplicate = first
+        duplicate.overloadEpisodeID = UUID()
+
+        XCTAssertEqual(
+            RestAttemptOutboxPolicy.normalized([first, duplicate]),
+            [first]
+        )
+    }
+
+    func testDiscardAllRemovesPendingAttemptsBeforeDataClear() {
+        var attempts = [makePendingAttempt(id: UUID())]
+
+        RestAttemptOutboxPolicy.discardAll(&attempts)
+
+        XCTAssertTrue(attempts.isEmpty)
+    }
+
+    private func makePendingAttempt(id: UUID) -> PendingRestAttempt {
+        PendingRestAttempt(
+            attempt: RestAttempt(
+                id: id,
+                trigger: .manual,
+                startedAt: Date(timeIntervalSince1970: 1_000),
+                endedAt: Date(timeIntervalSince1970: 1_010),
+                startFatiguePercent: 180,
+                duration: 10,
+                endFatiguePercent: 90,
+                outcome: .interrupted(.keyboard)
+            ),
+            overloadEpisodeID: UUID()
         )
     }
 }

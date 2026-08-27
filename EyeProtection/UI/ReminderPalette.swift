@@ -53,6 +53,56 @@ extension ReminderTheme {
                 panelBottom: Color(red: 0.030, green: 0.025, blue: 0.060),
                 panelMist: Color(red: 0.78, green: 0.55, blue: 0.36)
             )
+        case .mossGardenRain:
+            ReminderThemeStyle(
+                backdrop: Color(red: 12.0 / 255.0, green: 32.0 / 255.0, blue: 26.0 / 255.0),
+                surface: Color(red: 26.0 / 255.0, green: 53.0 / 255.0, blue: 40.0 / 255.0),
+                accent: Color(red: 128.0 / 255.0, green: 154.0 / 255.0, blue: 105.0 / 255.0),
+                accentHighlight: Color(red: 177.0 / 255.0, green: 199.0 / 255.0, blue: 150.0 / 255.0),
+                panelTop: Color(red: 17.0 / 255.0, green: 42.0 / 255.0, blue: 34.0 / 255.0),
+                panelBottom: Color(red: 7.0 / 255.0, green: 21.0 / 255.0, blue: 16.0 / 255.0),
+                panelMist: Color(red: 131.0 / 255.0, green: 155.0 / 255.0, blue: 121.0 / 255.0)
+            )
+        case .polarNightGlow:
+            ReminderThemeStyle(
+                backdrop: Color(red: 9.0 / 255.0, green: 19.0 / 255.0, blue: 39.0 / 255.0),
+                surface: Color(red: 20.0 / 255.0, green: 36.0 / 255.0, blue: 64.0 / 255.0),
+                accent: Color(red: 112.0 / 255.0, green: 143.0 / 255.0, blue: 196.0 / 255.0),
+                accentHighlight: Color(red: 160.0 / 255.0, green: 184.0 / 255.0, blue: 223.0 / 255.0),
+                panelTop: Color(red: 12.0 / 255.0, green: 25.0 / 255.0, blue: 50.0 / 255.0),
+                panelBottom: Color(red: 4.0 / 255.0, green: 9.0 / 255.0, blue: 20.0 / 255.0),
+                panelMist: Color(red: 123.0 / 255.0, green: 148.0 / 255.0, blue: 194.0 / 255.0)
+            )
+        case .moonlitBamboo:
+            ReminderThemeStyle(
+                backdrop: Color(red: 7.0 / 255.0, green: 31.0 / 255.0, blue: 32.0 / 255.0),
+                surface: Color(red: 18.0 / 255.0, green: 53.0 / 255.0, blue: 52.0 / 255.0),
+                accent: Color(red: 104.0 / 255.0, green: 164.0 / 255.0, blue: 149.0 / 255.0),
+                accentHighlight: Color(red: 151.0 / 255.0, green: 200.0 / 255.0, blue: 187.0 / 255.0),
+                panelTop: Color(red: 11.0 / 255.0, green: 41.0 / 255.0, blue: 40.0 / 255.0),
+                panelBottom: Color(red: 4.0 / 255.0, green: 21.0 / 255.0, blue: 21.0 / 255.0),
+                panelMist: Color(red: 118.0 / 255.0, green: 167.0 / 255.0, blue: 156.0 / 255.0)
+            )
+        case .rainwashedSeaCliff:
+            ReminderThemeStyle(
+                backdrop: Color(red: 10.0 / 255.0, green: 28.0 / 255.0, blue: 40.0 / 255.0),
+                surface: Color(red: 23.0 / 255.0, green: 54.0 / 255.0, blue: 67.0 / 255.0),
+                accent: Color(red: 101.0 / 255.0, green: 157.0 / 255.0, blue: 168.0 / 255.0),
+                accentHighlight: Color(red: 151.0 / 255.0, green: 194.0 / 255.0, blue: 203.0 / 255.0),
+                panelTop: Color(red: 13.0 / 255.0, green: 39.0 / 255.0, blue: 52.0 / 255.0),
+                panelBottom: Color(red: 5.0 / 255.0, green: 18.0 / 255.0, blue: 25.0 / 255.0),
+                panelMist: Color(red: 115.0 / 255.0, green: 156.0 / 255.0, blue: 168.0 / 255.0)
+            )
+        case .cloudfieldWind:
+            ReminderThemeStyle(
+                backdrop: Color(red: 17.0 / 255.0, green: 28.0 / 255.0, blue: 37.0 / 255.0),
+                surface: Color(red: 38.0 / 255.0, green: 54.0 / 255.0, blue: 65.0 / 255.0),
+                accent: Color(red: 130.0 / 255.0, green: 158.0 / 255.0, blue: 170.0 / 255.0),
+                accentHighlight: Color(red: 177.0 / 255.0, green: 199.0 / 255.0, blue: 208.0 / 255.0),
+                panelTop: Color(red: 24.0 / 255.0, green: 41.0 / 255.0, blue: 52.0 / 255.0),
+                panelBottom: Color(red: 8.0 / 255.0, green: 19.0 / 255.0, blue: 26.0 / 255.0),
+                panelMist: Color(red: 142.0 / 255.0, green: 167.0 / 255.0, blue: 175.0 / 255.0)
+            )
         }
     }
 }

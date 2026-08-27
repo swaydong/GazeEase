@@ -13,7 +13,7 @@ final class RestOverlayInteractionTests: XCTestCase {
             onBeginRest: { beginRestCount += 1 },
             onContinueWorking: { deferRestCount += 1 }
         )
-        defer { window.close() }
+        defer { retire(window) }
 
         let handled = window.performKeyEquivalent(with: try makeKeyEvent(keyCode: 36, characters: "\r"))
 
@@ -30,7 +30,7 @@ final class RestOverlayInteractionTests: XCTestCase {
             onBeginRest: { beginRestCount += 1 },
             onContinueWorking: { deferRestCount += 1 }
         )
-        defer { window.close() }
+        defer { retire(window) }
 
         let handled = window.performKeyEquivalent(with: try makeKeyEvent(keyCode: 53, characters: "\u{1b}"))
 
@@ -60,18 +60,27 @@ final class RestOverlayInteractionTests: XCTestCase {
             backing: .buffered,
             defer: false
         )
+        window.animationBehavior = .none
+        window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(
             rootView: RestOverlayScene(
                 presentation: presentation,
                 onBeginRest: onBeginRest,
                 onContinueWorking: onContinueWorking,
                 reduceMotionOverride: true,
-                reduceTransparencyOverride: false
+                reduceTransparencyOverride: false,
+                backgroundMaximumPixelDimensionOverride: 64
             )
         )
         window.makeKeyAndOrderFront(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         return window
+    }
+
+    private func retire(_ window: NSWindow) {
+        window.orderOut(nil)
+        window.contentView = nil
+        window.close()
     }
 
     private func makeKeyEvent(keyCode: UInt16, characters: String) throws -> NSEvent {

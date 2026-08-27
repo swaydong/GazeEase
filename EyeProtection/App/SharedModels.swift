@@ -83,6 +83,11 @@ enum ReminderTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     case forestLight
     case alpineMist
     case twilightDunes
+    case mossGardenRain
+    case polarNightGlow
+    case moonlitBamboo
+    case rainwashedSeaCliff
+    case cloudfieldWind
 
     static let defaultValue = ReminderTheme.quietHorizon
 
@@ -102,6 +107,16 @@ enum ReminderTheme: String, CaseIterable, Identifiable, Codable, Sendable {
             AppLocalization.string(L10nKey.themeAlpineMistName, language: language)
         case .twilightDunes:
             AppLocalization.string(L10nKey.themeTwilightDunesName, language: language)
+        case .mossGardenRain:
+            AppLocalization.string(L10nKey.themeMossGardenRainName, language: language)
+        case .polarNightGlow:
+            AppLocalization.string(L10nKey.themePolarNightGlowName, language: language)
+        case .moonlitBamboo:
+            AppLocalization.string(L10nKey.themeMoonlitBambooName, language: language)
+        case .rainwashedSeaCliff:
+            AppLocalization.string(L10nKey.themeRainwashedSeaCliffName, language: language)
+        case .cloudfieldWind:
+            AppLocalization.string(L10nKey.themeCloudfieldWindName, language: language)
         }
     }
 
@@ -119,6 +134,16 @@ enum ReminderTheme: String, CaseIterable, Identifiable, Codable, Sendable {
             AppLocalization.string(L10nKey.themeAlpineMistDescription, language: language)
         case .twilightDunes:
             AppLocalization.string(L10nKey.themeTwilightDunesDescription, language: language)
+        case .mossGardenRain:
+            AppLocalization.string(L10nKey.themeMossGardenRainDescription, language: language)
+        case .polarNightGlow:
+            AppLocalization.string(L10nKey.themePolarNightGlowDescription, language: language)
+        case .moonlitBamboo:
+            AppLocalization.string(L10nKey.themeMoonlitBambooDescription, language: language)
+        case .rainwashedSeaCliff:
+            AppLocalization.string(L10nKey.themeRainwashedSeaCliffDescription, language: language)
+        case .cloudfieldWind:
+            AppLocalization.string(L10nKey.themeCloudfieldWindDescription, language: language)
         }
     }
 
@@ -128,6 +153,11 @@ enum ReminderTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forestLight: "RestForest"
         case .alpineMist: "RestAlpine"
         case .twilightDunes: "RestDunes"
+        case .mossGardenRain: "RestMossGardenRain"
+        case .polarNightGlow: "RestPolarNightGlow"
+        case .moonlitBamboo: "RestMoonlitBamboo"
+        case .rainwashedSeaCliff: "RestRainwashedSeaCliff"
+        case .cloudfieldWind: "RestCloudfieldWind"
         }
     }
 
@@ -137,6 +167,11 @@ enum ReminderTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         case .forestLight: "ThemeForestPreview"
         case .alpineMist: "ThemeAlpinePreview"
         case .twilightDunes: "ThemeDunesPreview"
+        case .mossGardenRain: "ThemeMossGardenRainPreview"
+        case .polarNightGlow: "ThemePolarNightGlowPreview"
+        case .moonlitBamboo: "ThemeMoonlitBambooPreview"
+        case .rainwashedSeaCliff: "ThemeRainwashedSeaCliffPreview"
+        case .cloudfieldWind: "ThemeCloudfieldWindPreview"
         }
     }
 
@@ -374,11 +409,12 @@ struct ReminderPresentationPolicy {
     static func overlay(
         restRequired: Bool,
         isResting: Bool,
+        activeRestTrigger: RestTrigger?,
         promptState: ReminderPromptState,
         reminderMode: ReminderMode
     ) -> ReminderOverlayPhase? {
         if isResting {
-            return .resting
+            return activeRestTrigger == .manual ? .resting : nil
         }
         if restRequired,
            promptState == .initialDecision,
@@ -396,9 +432,11 @@ struct FatiguePoint: Identifiable, Sendable {
     var id: Date { timestamp }
 }
 
-struct DailyPeak: Identifiable, Sendable {
+struct DailyAnalyticsPoint: Identifiable, Sendable {
     let date: Date
-    let peak: Double
+    let peakFatigue: Double
+    let overloadDuration: TimeInterval
+    let longestUsageDuration: TimeInterval
 
     var id: Date { date }
 }
@@ -431,13 +469,13 @@ struct AnalyticsMetrics: Sendable {
 
 struct AnalyticsSnapshot: Sendable {
     var fatiguePoints: [FatiguePoint]
-    var dailyPeaks: [DailyPeak]
+    var dailyPoints: [DailyAnalyticsPoint]
     var today: AnalyticsMetrics
     var week: AnalyticsMetrics
 
     static let empty = AnalyticsSnapshot(
         fatiguePoints: [],
-        dailyPeaks: [],
+        dailyPoints: [],
         today: .empty,
         week: .empty
     )

@@ -1,9 +1,41 @@
 import Foundation
 import SwiftUI
 
+enum MonitoringRecheckFeedback: Equatable {
+    case permissionRequired
+    case unavailable
+    case running
+
+    init(inputPermissionGranted: Bool, isMonitoringComplete: Bool) {
+        if !inputPermissionGranted {
+            self = .permissionRequired
+        } else if !isMonitoringComplete {
+            self = .unavailable
+        } else {
+            self = .running
+        }
+    }
+
+    var titleKey: L10nKey {
+        switch self {
+        case .permissionRequired:
+            .settingsInputMonitoringCheckPermissionRequired
+        case .unavailable:
+            .settingsInputMonitoringCheckUnavailable
+        case .running:
+            .settingsInputMonitoringCheckRunning
+        }
+    }
+
+    var isSuccess: Bool {
+        self == .running
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @State private var isConfirmingClear = false
+    @State private var monitoringRecheckFeedback: MonitoringRecheckFeedback?
     @State private var workMinutesInput = ""
     @State private var restSecondsInput = ""
     @State private var inactivityRestMinutesInput = ""
@@ -231,13 +263,12 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else if !model.isMonitoringComplete {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(localized(.settingsInputMonitoringStarting))
-                    }
+                    Label(
+                        localized(.settingsInputMonitoringUnavailable),
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(EyePalette.watch)
                 } else {
                     Label(
                         localized(.settingsInputMonitoringRunning),
@@ -247,8 +278,39 @@ struct SettingsView: View {
                     .foregroundStyle(EyePalette.calm)
                 }
 
-                Button(localized(.settingsInputMonitoringRecheck)) {
-                    model.refreshMonitoringStatus()
+                HStack(spacing: 10) {
+                    if model.inputPermissionGranted, !model.isMonitoringComplete {
+                        Button(localized(.settingsInputMonitoringRepair)) {
+                            model.openInputMonitoringSettings()
+                        }
+                    }
+
+                    Button(localized(.settingsInputMonitoringRecheck)) {
+                        recheckMonitoring()
+                    }
+
+                    Button(localized(.settingsInputMonitoringTestReminder)) {
+                        model.showTestReminderPreview()
+                    }
+                    .disabled(!model.canShowTestReminderPreview)
+                    .accessibilityHint(localized(
+                        .settingsInputMonitoringTestReminderAccessibilityHint
+                    ))
+                }
+
+                if let monitoringRecheckFeedback {
+                    Label(
+                        localized(monitoringRecheckFeedback.titleKey),
+                        systemImage: monitoringRecheckFeedback.isSuccess
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.circle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        monitoringRecheckFeedback.isSuccess
+                            ? EyePalette.calm
+                            : EyePalette.watch
+                    )
                 }
             }
 
@@ -306,6 +368,12 @@ struct SettingsView: View {
             focusedDurationField = nil
             resetDurationInputs()
         }
+        .onChange(of: model.inputPermissionGranted) { _, _ in
+            updateMonitoringFeedbackIfVisible()
+        }
+        .onChange(of: model.isMonitoringComplete) { _, _ in
+            updateMonitoringFeedbackIfVisible()
+        }
         .onDisappear {
             commitWorkMinutesInput()
             commitRestSecondsInput()
@@ -328,6 +396,22 @@ struct SettingsView: View {
 
     private func localized(_ key: L10nKey) -> String {
         AppLocalization.string(key, language: language)
+    }
+
+    private func recheckMonitoring() {
+        model.refreshMonitoringStatus()
+        monitoringRecheckFeedback = MonitoringRecheckFeedback(
+            inputPermissionGranted: model.inputPermissionGranted,
+            isMonitoringComplete: model.isMonitoringComplete
+        )
+    }
+
+    private func updateMonitoringFeedbackIfVisible() {
+        guard monitoringRecheckFeedback != nil else { return }
+        monitoringRecheckFeedback = MonitoringRecheckFeedback(
+            inputPermissionGranted: model.inputPermissionGranted,
+            isMonitoringComplete: model.isMonitoringComplete
+        )
     }
 
     private func commitWorkMinutesInput() {
@@ -388,13 +472,38 @@ struct SettingsView: View {
 }
 
 enum ReminderThemePickerLayout {
-    static let cardSize = CGSize(width: 112, height: 82)
+    static let columns = 3
+    static let cardSize = CGSize(width: 152, height: 90)
     static let atmosphereSize = CGSize(width: 472, height: 116)
     static let spacing: CGFloat = 8
 
+    static var rows: Int {
+        Int(ceil(Double(ReminderTheme.allCases.count) / Double(columns)))
+    }
+
     static var totalWidth: CGFloat {
-        (cardSize.width * CGFloat(ReminderTheme.allCases.count))
-            + (spacing * CGFloat(ReminderTheme.allCases.count - 1))
+        (cardSize.width * CGFloat(columns))
+            + (spacing * CGFloat(columns - 1))
+    }
+
+    static var totalHeight: CGFloat {
+        (cardSize.height * CGFloat(rows))
+            + (spacing * CGFloat(max(0, rows - 1)))
+    }
+
+    static var gridSize: CGSize {
+        CGSize(width: totalWidth, height: totalHeight)
+    }
+
+    static var gridColumns: [GridItem] {
+        Array(
+            repeating: GridItem(
+                .fixed(cardSize.width),
+                spacing: spacing,
+                alignment: .top
+            ),
+            count: columns
+        )
     }
 }
 
@@ -430,7 +539,7 @@ struct ReminderThemeAtmosphereScene: View {
 
             LinearGradient(
                 colors: [
-                    .black.opacity(reduceTransparency ? 0.42 : 0.18),
+                    .black.opacity(atmosphereTopShade),
                     .black.opacity(reduceTransparency ? 0.78 : 0.72)
                 ],
                 startPoint: .topTrailing,
@@ -517,6 +626,13 @@ struct ReminderThemeAtmosphereScene: View {
             : AppLocalization.string(.themeSelectionAccessibilityManual, language: language)
     }
 
+    private var atmosphereTopShade: Double {
+        if theme == .rainwashedSeaCliff {
+            return reduceTransparency ? 0.50 : 0.32
+        }
+        return reduceTransparency ? 0.42 : 0.18
+    }
+
     @ViewBuilder
     private var atmosphereBackground: some View {
         if reduceTransparency {
@@ -584,7 +700,11 @@ struct ReminderThemePickerScene: View {
     let onSelect: (ReminderTheme) -> Void
 
     var body: some View {
-        HStack(spacing: ReminderThemePickerLayout.spacing) {
+        LazyVGrid(
+            columns: ReminderThemePickerLayout.gridColumns,
+            alignment: .leading,
+            spacing: ReminderThemePickerLayout.spacing
+        ) {
             ForEach(ReminderTheme.allCases) { theme in
                 ReminderThemeChoiceScene(
                     theme: theme,
@@ -595,7 +715,11 @@ struct ReminderThemePickerScene: View {
                 )
             }
         }
-        .padding(.vertical, 4)
+        .frame(
+            width: ReminderThemePickerLayout.totalWidth,
+            height: ReminderThemePickerLayout.totalHeight,
+            alignment: .topLeading
+        )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(AppLocalization.string(
             .themeBackgroundAccessibility,
@@ -606,25 +730,31 @@ struct ReminderThemePickerScene: View {
 
 enum ReminderThemePreviewFocus: String, CaseIterable, Hashable {
     case centeredValley
+    case bottomCenter
     case forestCanopy
     case rightPeak
     case rightHorizon
+    case rightCenterHorizon
 
     var anchor: UnitPoint {
         switch self {
         case .centeredValley: .center
+        case .bottomCenter: .bottom
         case .forestCanopy: .top
         case .rightPeak: .topTrailing
         case .rightHorizon: .bottomTrailing
+        case .rightCenterHorizon: .trailing
         }
     }
 
     var glowCenter: UnitPoint {
         switch self {
         case .centeredValley: .bottom
+        case .bottomCenter: .bottom
         case .forestCanopy: .top
         case .rightPeak: .topTrailing
         case .rightHorizon: .bottomTrailing
+        case .rightCenterHorizon: .bottomTrailing
         }
     }
 }
@@ -671,6 +801,46 @@ extension ReminderTheme {
                 saturation: 0.94,
                 contrast: 1.10,
                 brightness: 0.01
+            )
+        case .mossGardenRain:
+            ReminderThemeCardTreatment(
+                focus: .bottomCenter,
+                scale: 1.06,
+                saturation: 0.76,
+                contrast: 1.12,
+                brightness: -0.03
+            )
+        case .polarNightGlow:
+            ReminderThemeCardTreatment(
+                focus: .centeredValley,
+                scale: 1.08,
+                saturation: 0.72,
+                contrast: 1.14,
+                brightness: -0.04
+            )
+        case .moonlitBamboo:
+            ReminderThemeCardTreatment(
+                focus: .forestCanopy,
+                scale: 1.04,
+                saturation: 0.80,
+                contrast: 1.15,
+                brightness: -0.03
+            )
+        case .rainwashedSeaCliff:
+            ReminderThemeCardTreatment(
+                focus: .bottomCenter,
+                scale: 1.09,
+                saturation: 0.74,
+                contrast: 1.13,
+                brightness: -0.08
+            )
+        case .cloudfieldWind:
+            ReminderThemeCardTreatment(
+                focus: .rightCenterHorizon,
+                scale: 1.08,
+                saturation: 0.68,
+                contrast: 1.09,
+                brightness: -0.03
             )
         }
     }

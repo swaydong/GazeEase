@@ -26,16 +26,34 @@ public final class SystemPresenceMonitor {
     }
 
     public typealias ChangeHandler = @MainActor @Sendable (State) -> Void
+    typealias CurrentReasonsProvider = @MainActor @Sendable () -> Set<Reason>
 
     public var onChange: ChangeHandler?
     public private(set) var isRunning = false
     public private(set) var state = State(isAway: false, reason: .active, timestamp: Date())
 
+    private let activeTransitionDelay: Duration
+    private let currentReasonsProvider: CurrentReasonsProvider
     private var activeReasons: Set<Reason> = []
     private var workspaceTokens: [NSObjectProtocol] = []
     private var distributedTokens: [NSObjectProtocol] = []
+    private var activeTransitionTask: Task<Void, Never>?
+    private var currentReasonsRecheckTask: Task<Void, Never>?
 
-    public init() {}
+    public convenience init() {
+        self.init(
+            activeTransitionDelay: .milliseconds(300),
+            currentReasonsProvider: Self.currentSystemReasons
+        )
+    }
+
+    init(
+        activeTransitionDelay: Duration,
+        currentReasonsProvider: @escaping CurrentReasonsProvider
+    ) {
+        self.activeTransitionDelay = activeTransitionDelay
+        self.currentReasonsProvider = currentReasonsProvider
+    }
 
     public func start() {
         guard !isRunning else { return }
@@ -43,36 +61,36 @@ public final class SystemPresenceMonitor {
 
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         observe(workspaceCenter, name: NSWorkspace.willSleepNotification) { monitor in
-            monitor.set(.systemSleep, active: true)
+            monitor.record(.systemSleep, active: true)
         }
         observe(workspaceCenter, name: NSWorkspace.didWakeNotification) { monitor in
-            monitor.set(.systemSleep, active: false)
+            monitor.record(.systemSleep, active: false)
         }
         observe(workspaceCenter, name: NSWorkspace.screensDidSleepNotification) { monitor in
-            monitor.set(.screensAsleep, active: true)
+            monitor.record(.screensAsleep, active: true)
         }
         observe(workspaceCenter, name: NSWorkspace.screensDidWakeNotification) { monitor in
-            monitor.set(.screensAsleep, active: false)
+            monitor.record(.screensAsleep, active: false)
         }
         observe(workspaceCenter, name: NSWorkspace.sessionDidResignActiveNotification) { monitor in
-            monitor.set(.sessionInactive, active: true)
+            monitor.record(.sessionInactive, active: true)
         }
         observe(workspaceCenter, name: NSWorkspace.sessionDidBecomeActiveNotification) { monitor in
-            monitor.set(.sessionInactive, active: false)
+            monitor.record(.sessionInactive, active: false)
         }
 
         let distributedCenter = DistributedNotificationCenter.default()
         observe(distributedCenter, name: Notification.Name("com.apple.screenIsLocked")) { monitor in
-            monitor.set(.sessionInactive, active: true)
+            monitor.record(.sessionInactive, active: true)
         }
         observe(distributedCenter, name: Notification.Name("com.apple.screenIsUnlocked")) { monitor in
-            monitor.set(.sessionInactive, active: false)
+            monitor.record(.sessionInactive, active: false)
         }
 
-        if CGDisplayIsAsleep(CGMainDisplayID()) != 0 {
-            set(.screensAsleep, active: true)
-        } else {
-            publishIfChanged()
+        activeReasons.formUnion(currentReasonsProvider())
+        publishIfChanged(at: Date())
+        if !activeReasons.isEmpty {
+            scheduleCurrentReasonsRecheck()
         }
     }
 
@@ -86,9 +104,13 @@ public final class SystemPresenceMonitor {
         distributedTokens.forEach(distributedCenter.removeObserver)
         distributedTokens.removeAll()
 
+        activeTransitionTask?.cancel()
+        activeTransitionTask = nil
+        currentReasonsRecheckTask?.cancel()
+        currentReasonsRecheckTask = nil
         activeReasons.removeAll()
         isRunning = false
-        publishIfChanged()
+        state = State(isAway: false, reason: .active, timestamp: Date())
     }
 
     private func observe(
@@ -119,22 +141,80 @@ public final class SystemPresenceMonitor {
         distributedTokens.append(token)
     }
 
-    private func set(_ reason: Reason, active: Bool) {
+    func record(_ reason: Reason, active: Bool, at timestamp: Date = Date()) {
         guard reason != .active else { return }
         if active {
+            activeTransitionTask?.cancel()
+            activeTransitionTask = nil
+            currentReasonsRecheckTask?.cancel()
+            currentReasonsRecheckTask = nil
             activeReasons.insert(reason)
+            publishIfChanged(at: timestamp)
         } else {
             activeReasons.remove(reason)
+            if activeReasons.isEmpty {
+                currentReasonsRecheckTask?.cancel()
+                currentReasonsRecheckTask = nil
+                scheduleActiveTransition()
+            } else {
+                publishIfChanged(at: timestamp)
+            }
         }
-        publishIfChanged()
     }
 
-    private func publishIfChanged() {
+    func completePendingActiveTransition(at timestamp: Date = Date()) {
+        activeTransitionTask?.cancel()
+        activeTransitionTask = nil
+        guard activeReasons.isEmpty else { return }
+
+        activeReasons.formUnion(currentReasonsProvider())
+        publishIfChanged(at: timestamp)
+        if !activeReasons.isEmpty {
+            scheduleCurrentReasonsRecheck()
+        }
+    }
+
+    func recheckCurrentReasons(at timestamp: Date = Date()) {
+        currentReasonsRecheckTask?.cancel()
+        currentReasonsRecheckTask = nil
+        activeReasons = currentReasonsProvider()
+        publishIfChanged(at: timestamp)
+    }
+
+    private func scheduleActiveTransition() {
+        activeTransitionTask?.cancel()
+        activeTransitionTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: self?.activeTransitionDelay ?? .zero)
+            } catch {
+                return
+            }
+            guard let self, self.isRunning else { return }
+            self.activeTransitionTask = nil
+            self.completePendingActiveTransition()
+        }
+    }
+
+    private func scheduleCurrentReasonsRecheck() {
+        currentReasonsRecheckTask?.cancel()
+        currentReasonsRecheckTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: self?.activeTransitionDelay ?? .zero)
+            } catch {
+                return
+            }
+            guard let self, self.isRunning else { return }
+            self.currentReasonsRecheckTask = nil
+            self.recheckCurrentReasons()
+        }
+    }
+
+    private func publishIfChanged(at timestamp: Date) {
         let reason = primaryReason
         let isAway = reason != .active
         guard state.isAway != isAway || state.reason != reason else { return }
 
-        state = State(isAway: isAway, reason: reason, timestamp: Date())
+        state = State(isAway: isAway, reason: reason, timestamp: timestamp)
         onChange?(state)
     }
 
@@ -145,6 +225,26 @@ public final class SystemPresenceMonitor {
         if activeReasons.contains(.sessionInactive) { return .sessionInactive }
         if activeReasons.contains(.screensAsleep) { return .screensAsleep }
         return .active
+    }
+
+    private static func currentSystemReasons() -> Set<Reason> {
+        var reasons: Set<Reason> = []
+        if CGDisplayIsAsleep(CGMainDisplayID()) != 0 {
+            reasons.insert(.screensAsleep)
+        }
+        if isCurrentSessionInactive {
+            reasons.insert(.sessionInactive)
+        }
+        return reasons
+    }
+
+    private static var isCurrentSessionInactive: Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+            return false
+        }
+        let isLocked = session["CGSSessionScreenIsLocked"] as? Bool ?? false
+        let isOnConsole = session["kCGSSessionOnConsoleKey"] as? Bool ?? true
+        return isLocked || !isOnConsole
     }
 
 }

@@ -89,6 +89,7 @@ struct RestOverlayScene: View {
 
     private let reduceMotionOverride: Bool?
     private let reduceTransparencyOverride: Bool?
+    private let backgroundMaximumPixelDimensionOverride: Int?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -100,7 +101,8 @@ struct RestOverlayScene: View {
         onBeginRest: @escaping () -> Void,
         onContinueWorking: @escaping () -> Void,
         reduceMotionOverride: Bool? = nil,
-        reduceTransparencyOverride: Bool? = nil
+        reduceTransparencyOverride: Bool? = nil,
+        backgroundMaximumPixelDimensionOverride: Int? = nil
     ) {
         self.presentation = presentation
         self.theme = theme
@@ -109,6 +111,7 @@ struct RestOverlayScene: View {
         self.onContinueWorking = onContinueWorking
         self.reduceMotionOverride = reduceMotionOverride
         self.reduceTransparencyOverride = reduceTransparencyOverride
+        self.backgroundMaximumPixelDimensionOverride = backgroundMaximumPixelDimensionOverride
     }
 
     var body: some View {
@@ -119,8 +122,10 @@ struct RestOverlayScene: View {
                     ? presentation.clampedRestProgress
                     : 0,
                 reduceMotion: effectiveReduceMotion,
-                reduceTransparency: effectiveReduceTransparency
+                reduceTransparency: effectiveReduceTransparency,
+                maximumPixelDimensionOverride: backgroundMaximumPixelDimensionOverride
             )
+            .id(theme)
 
             RestContentReadabilityScrim(
                 mode: presentation.mode,
@@ -302,21 +307,52 @@ private struct RestThemeBackground: View {
     let reduceMotion: Bool
     let reduceTransparency: Bool
 
+    @StateObject private var backgroundLease: RestBackgroundImageLease
+
+    @MainActor
+    init(
+        theme: ReminderTheme,
+        restProgress: Double,
+        reduceMotion: Bool,
+        reduceTransparency: Bool,
+        maximumPixelDimensionOverride: Int?
+    ) {
+        self.theme = theme
+        self.restProgress = restProgress
+        self.reduceMotion = reduceMotion
+        self.reduceTransparency = reduceTransparency
+        let maximumPixelDimension = maximumPixelDimensionOverride
+            ?? RestBackgroundImageLoader.recommendedMaximumPixelDimension()
+        _backgroundLease = StateObject(wrappedValue: RestBackgroundImageLoader.shared.lease(
+            for: theme,
+            maximumPixelDimension: maximumPixelDimension
+        ))
+    }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 let imageFrame = horizonImageFrame(for: proxy.size)
 
-                Image(theme.backgroundAssetName)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: imageFrame.width, height: imageFrame.height)
-                    .position(
-                        x: proxy.size.width / 2,
-                        y: imageFrame.height / 2 + imageFrame.offsetY
-                    )
+                LinearGradient(
+                    colors: [theme.style.surface, theme.style.backdrop],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-                Color.black.opacity(reduceTransparency ? 0.32 : 0.15)
+                if let backgroundImage = backgroundLease.image {
+                    Image(decorative: backgroundImage, scale: 1, orientation: .up)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: imageFrame.width, height: imageFrame.height)
+                        .position(
+                            x: proxy.size.width / 2,
+                            y: imageFrame.height / 2 + imageFrame.offsetY
+                        )
+                        .transition(.opacity)
+                }
+
+                Color.black.opacity(backgroundDimOpacity)
 
                 if restProgress > 0 {
                     RadialGradient(
@@ -338,6 +374,10 @@ private struct RestThemeBackground: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.24),
+                value: backgroundLease.image != nil
+            )
         }
         .accessibilityHidden(true)
     }
@@ -355,6 +395,13 @@ private struct RestThemeBackground: View {
         let desiredOffset = (viewport.height * focusPosition) - (height * focusPosition)
         let offsetY = min(0, max(viewport.height - height, desiredOffset))
         return (width, height, offsetY)
+    }
+
+    private var backgroundDimOpacity: Double {
+        if theme == .rainwashedSeaCliff {
+            return reduceTransparency ? 0.40 : 0.23
+        }
+        return reduceTransparency ? 0.32 : 0.15
     }
 }
 

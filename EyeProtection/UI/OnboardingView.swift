@@ -14,6 +14,45 @@ enum OnboardingPermissionPhase: Equatable {
             self = .ready
         }
     }
+
+    var primaryAction: OnboardingPrimaryAction {
+        switch self {
+        case .authorizationRequired:
+            .authorize
+        case .starting:
+            .recheck
+        case .ready:
+            .complete
+        }
+    }
+}
+
+enum OnboardingPrimaryAction: Equatable {
+    case authorize
+    case recheck
+    case complete
+
+    var titleKey: L10nKey {
+        switch self {
+        case .authorize:
+            .onboardingPermissionAuthorize
+        case .recheck:
+            .onboardingPermissionRecheck
+        case .complete:
+            .onboardingFinish
+        }
+    }
+
+    var accessibilityHintKey: L10nKey {
+        switch self {
+        case .authorize:
+            .onboardingPermissionAuthorizeAccessibilityHint
+        case .recheck:
+            .onboardingPermissionRecheckAccessibilityHint
+        case .complete:
+            .onboardingFinishAccessibilityHint
+        }
+    }
 }
 
 struct OnboardingView: View {
@@ -46,6 +85,9 @@ struct OnboardingView: View {
             .padding(24)
         }
         .frame(width: 520, height: 520)
+        .onAppear {
+            model.refreshMonitoringStatus()
+        }
     }
 
     private var header: some View {
@@ -126,19 +168,30 @@ struct OnboardingView: View {
                     permissionStatus
                     Spacer()
 
-                    if permissionPhase == .authorizationRequired {
+                    if permissionPhase == .starting {
                         Button(
                             AppLocalization.string(
-                                .onboardingPermissionAuthorize,
+                                .onboardingPermissionRepair,
                                 language: language
                             )
                         ) {
-                            model.requestInputPermission()
+                            model.openInputMonitoringSettings()
                         }
                         .buttonStyle(OnboardingSecondaryButtonStyle())
+                    } else if permissionPhase == .ready {
+                        Button(
+                            AppLocalization.string(
+                                .onboardingPermissionTestReminder,
+                                language: language
+                            )
+                        ) {
+                            model.showTestReminderPreview()
+                        }
+                        .buttonStyle(OnboardingSecondaryButtonStyle())
+                        .disabled(!model.canShowTestReminderPreview)
                         .accessibilityHint(
                             AppLocalization.string(
-                                .onboardingPermissionAuthorizeAccessibilityHint,
+                                .onboardingPermissionTestReminderAccessibilityHint,
                                 language: language
                             )
                         )
@@ -204,14 +257,23 @@ struct OnboardingView: View {
     }
 
     private var finishButton: some View {
-        Button(AppLocalization.string(.onboardingFinish, language: language)) {
-            model.completeOnboarding()
-            onComplete()
+        let action = permissionPhase.primaryAction
+        return Button(AppLocalization.string(action.titleKey, language: language)) {
+            switch action {
+            case .authorize:
+                model.requestInputPermission()
+            case .recheck:
+                model.refreshMonitoringStatus()
+            case .complete:
+                if model.completeOnboarding() {
+                    onComplete()
+                }
+            }
         }
         .buttonStyle(OnboardingPrimaryButtonStyle())
         .keyboardShortcut(.defaultAction)
         .accessibilityHint(
-            AppLocalization.string(.onboardingFinishAccessibilityHint, language: language)
+            AppLocalization.string(action.accessibilityHintKey, language: language)
         )
     }
 }

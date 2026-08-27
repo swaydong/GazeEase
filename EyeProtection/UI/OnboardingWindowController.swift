@@ -2,6 +2,12 @@ import AppKit
 import Combine
 import SwiftUI
 
+enum OnboardingWindowPolicy {
+    static func canClose(onboardingCompleted: Bool) -> Bool {
+        onboardingCompleted
+    }
+}
+
 @MainActor
 final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private let model: AppModel
@@ -13,10 +19,21 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         super.init()
 
         model.$appLanguage
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.updateWindowTitle()
+                }
+            }
+            .store(in: &cancellables)
+
+        model.$onboardingCompleted
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.updateCloseButtonAvailability()
                 }
             }
             .store(in: &cancellables)
@@ -30,7 +47,11 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     func show() {
         let window = window ?? makeWindow()
         self.window = window
+        if window.contentView == nil {
+            installContent(in: window)
+        }
         updateWindowTitle()
+        updateCloseButtonAvailability()
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -38,10 +59,17 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
 
     func close() {
         window?.orderOut(nil)
+        window?.contentView = nil
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        sender.orderOut(nil)
+        guard OnboardingWindowPolicy.canClose(
+            onboardingCompleted: model.onboardingCompleted
+        ) else {
+            NSSound.beep()
+            return false
+        }
+        close()
         return false
     }
 
@@ -66,6 +94,11 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentMinSize = NSSize(width: 520, height: 520)
         window.contentMaxSize = NSSize(width: 520, height: 520)
+        installContent(in: window)
+        return window
+    }
+
+    private func installContent(in window: NSWindow) {
         window.contentView = NSHostingView(
             rootView: OnboardingView(
                 model: model,
@@ -74,7 +107,6 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
                 }
             )
         )
-        return window
     }
 
     private func updateWindowTitle() {
@@ -82,5 +114,12 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             .onboardingWindowTitle,
             language: model.resolvedLanguage
         )
+    }
+
+    private func updateCloseButtonAvailability() {
+        window?.standardWindowButton(.closeButton)?.isEnabled =
+            OnboardingWindowPolicy.canClose(
+                onboardingCompleted: model.onboardingCompleted
+            )
     }
 }

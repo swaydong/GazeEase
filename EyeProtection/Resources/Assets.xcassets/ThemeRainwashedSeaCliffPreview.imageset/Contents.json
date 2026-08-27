@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "ThemeRainwashedSeaCliffPreview.png",
+      "idiom" : "mac",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "ThemeRainwashedSeaCliffPreview@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

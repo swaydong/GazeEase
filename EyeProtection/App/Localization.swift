@@ -110,6 +110,16 @@ enum L10nKey: String, CaseIterable, Sendable {
     case themeAlpineMistDescription = "theme.alpine_mist.description"
     case themeTwilightDunesName = "theme.twilight_dunes.name"
     case themeTwilightDunesDescription = "theme.twilight_dunes.description"
+    case themeMossGardenRainName = "theme.moss_garden_rain.name"
+    case themeMossGardenRainDescription = "theme.moss_garden_rain.description"
+    case themePolarNightGlowName = "theme.polar_night_glow.name"
+    case themePolarNightGlowDescription = "theme.polar_night_glow.description"
+    case themeMoonlitBambooName = "theme.moonlit_bamboo.name"
+    case themeMoonlitBambooDescription = "theme.moonlit_bamboo.description"
+    case themeRainwashedSeaCliffName = "theme.rainwashed_sea_cliff.name"
+    case themeRainwashedSeaCliffDescription = "theme.rainwashed_sea_cliff.description"
+    case themeCloudfieldWindName = "theme.cloudfield_wind.name"
+    case themeCloudfieldWindDescription = "theme.cloudfield_wind.description"
     case themeCurrent = "theme.current"
     case themeSelectionManual = "theme.selection.manual"
     case themeSelectionAutomatic = "theme.selection.automatic"
@@ -148,6 +158,16 @@ enum L10nKey: String, CaseIterable, Sendable {
     case menuResting = "menu.resting"
     case menuRestRemaining = "menu.rest_remaining"
     case menuMonitoringIncomplete = "menu.monitoring_incomplete"
+    case menuMonitoringPermissionRequired = "menu.monitoring.permission_required"
+    case menuMonitoringUnavailable = "menu.monitoring.unavailable"
+    case menuMonitoringRepair = "menu.monitoring.repair"
+    case menuMonitoringRepairAccessibilityHint =
+        "menu.monitoring.repair.accessibility_hint"
+    case menuTodayOverviewTitle = "menu.today_overview.title"
+    case menuTodayOverviewOverload = "menu.today_overview.overload"
+    case menuTodayOverviewOverloadClear = "menu.today_overview.overload_clear"
+    case menuTodayFatiguePeak = "menu.today_fatigue.peak"
+    case menuTodayFatigueAccessibility = "menu.today_fatigue.accessibility"
 
     case overduePanelTitle = "overdue_panel.title"
     case overduePanelDetail = "overdue_panel.detail"
@@ -199,7 +219,17 @@ enum L10nKey: String, CaseIterable, Sendable {
     case settingsInputMonitoringStalePermission = "settings.input_monitoring.stale_permission"
     case settingsInputMonitoringStarting = "settings.input_monitoring.starting"
     case settingsInputMonitoringRunning = "settings.input_monitoring.running"
+    case settingsInputMonitoringUnavailable = "settings.input_monitoring.unavailable"
+    case settingsInputMonitoringRepair = "settings.input_monitoring.repair"
     case settingsInputMonitoringRecheck = "settings.input_monitoring.recheck"
+    case settingsInputMonitoringCheckPermissionRequired =
+        "settings.input_monitoring.check.permission_required"
+    case settingsInputMonitoringCheckUnavailable =
+        "settings.input_monitoring.check.unavailable"
+    case settingsInputMonitoringCheckRunning = "settings.input_monitoring.check.running"
+    case settingsInputMonitoringTestReminder = "settings.input_monitoring.test_reminder"
+    case settingsInputMonitoringTestReminderAccessibilityHint =
+        "settings.input_monitoring.test_reminder.accessibility_hint"
     case settingsPermissionGranted = "settings.permission.granted"
     case settingsPermissionAuthorize = "settings.permission.authorize"
     case settingsSectionGeneral = "settings.section.general"
@@ -225,6 +255,13 @@ enum L10nKey: String, CaseIterable, Sendable {
     case onboardingPermissionAuthorize = "onboarding.permission.authorize"
     case onboardingPermissionAuthorizeAccessibilityHint =
         "onboarding.permission.authorize.accessibility_hint"
+    case onboardingPermissionRecheck = "onboarding.permission.recheck"
+    case onboardingPermissionRecheckAccessibilityHint =
+        "onboarding.permission.recheck.accessibility_hint"
+    case onboardingPermissionRepair = "onboarding.permission.repair"
+    case onboardingPermissionTestReminder = "onboarding.permission.test_reminder"
+    case onboardingPermissionTestReminderAccessibilityHint =
+        "onboarding.permission.test_reminder.accessibility_hint"
     case onboardingPermissionStatusAuthorizationRequired =
         "onboarding.permission.status.authorization_required"
     case onboardingPermissionStatusStarting = "onboarding.permission.status.starting"
@@ -240,13 +277,27 @@ enum L10nKey: String, CaseIterable, Sendable {
     case analyticsRangeToday = "analytics.range.today"
     case analyticsRangeWeek = "analytics.range.week"
     case analyticsCurrentFatigue = "analytics.current_fatigue"
+    case analyticsSummaryAccessibility = "analytics.summary.accessibility"
     case analyticsWaitingForRest = "analytics.waiting_for_rest"
     case analyticsOverloadSince = "analytics.overload_since"
     case analyticsRestFrequency = "analytics.rest_frequency"
     case analyticsChartTitle = "analytics.chart.title"
     case analyticsChartThreshold = "analytics.chart.threshold"
+    case analyticsChartOverloadZone = "analytics.chart.overload_zone"
+    case analyticsTrendTodayTitle = "analytics.trend.today.title"
+    case analyticsTrendTodaySubtitle = "analytics.trend.today.subtitle"
+    case analyticsTrendWeekTitle = "analytics.trend.week.title"
+    case analyticsTrendWeekSubtitle = "analytics.trend.week.subtitle"
+    case analyticsTrendWeekOverloadTitle = "analytics.trend.week.overload_title"
+    case analyticsTrendWeekPeakTitle = "analytics.trend.week.peak_title"
+    case analyticsChartTodayAccessibility = "analytics.chart.today.accessibility"
+    case analyticsChartWeekAccessibility = "analytics.chart.week.accessibility"
     case analyticsChartEmptyTitle = "analytics.chart.empty.title"
     case analyticsChartEmptyDescription = "analytics.chart.empty.description"
+    case analyticsZeroTodayTitle = "analytics.zero.today.title"
+    case analyticsZeroTodayDescription = "analytics.zero.today.description"
+    case analyticsZeroWeekTitle = "analytics.zero.week.title"
+    case analyticsZeroWeekDescription = "analytics.zero.week.description"
     case analyticsChartAxisTime = "analytics.chart.axis.time"
     case analyticsChartAxisFatigue = "analytics.chart.axis.fatigue"
     case analyticsChartAxisDate = "analytics.chart.axis.date"
@@ -254,16 +305,27 @@ enum L10nKey: String, CaseIterable, Sendable {
     case analyticsChartRestLine = "analytics.chart.rest_line"
     case analyticsMetricPeakFatigueTitle = "analytics.metric.peak_fatigue.title"
     case analyticsMetricPeakFatigueDetail = "analytics.metric.peak_fatigue.detail"
+    case analyticsMetricPeakFatigueZero = "analytics.metric.peak_fatigue.zero"
     case analyticsMetricOverloadDurationTitle = "analytics.metric.overload_duration.title"
     case analyticsMetricOverloadDurationDetail = "analytics.metric.overload_duration.detail"
+    case analyticsMetricOverloadDurationZero = "analytics.metric.overload_duration.zero"
     case analyticsMetricLongestUsageTitle = "analytics.metric.longest_usage.title"
     case analyticsMetricLongestUsageDetail = "analytics.metric.longest_usage.detail"
+    case analyticsMetricLongestUsageZero = "analytics.metric.longest_usage.zero"
     case analyticsMetricCompletedRestTitle = "analytics.metric.completed_rest.title"
     case analyticsMetricCompletedRestDetail = "analytics.metric.completed_rest.detail"
     case analyticsMetricInterruptedRestTitle = "analytics.metric.interrupted_rest.title"
     case analyticsMetricInterruptedRestDetail = "analytics.metric.interrupted_rest.detail"
     case analyticsMetricAverageResponseTitle = "analytics.metric.average_response.title"
     case analyticsMetricAverageResponseDetail = "analytics.metric.average_response.detail"
+    case analyticsMetricAverageResponseNoData = "analytics.metric.average_response.no_data"
+    case analyticsRestSummaryTitle = "analytics.rest.summary.title"
+    case analyticsRestCompletedRatio = "analytics.rest.completed_ratio"
+    case analyticsRestCompletedRatioCaption = "analytics.rest.completed_ratio.caption"
+    case analyticsRestNoAttempts = "analytics.rest.no_attempts"
+    case analyticsRestSourcesTitle = "analytics.rest.sources.title"
+    case analyticsRestSummaryAccessibility = "analytics.rest.summary.accessibility"
+    case analyticsRestSummaryAccessibilityEmpty = "analytics.rest.summary.accessibility.empty"
     case analyticsEvidenceManualRest = "analytics.evidence.manual_rest"
     case analyticsEvidenceLockOrSleep = "analytics.evidence.lock_or_sleep"
     case analyticsEvidenceInactivityRest = "analytics.evidence.inactivity_rest"
@@ -272,6 +334,7 @@ enum L10nKey: String, CaseIterable, Sendable {
 
 enum AppLocalization {
     private static let tableName = "Localizable"
+    private static let localizedBundleCache = LocalizationBundleCache()
 
     static func string(
         _ key: L10nKey,
@@ -425,10 +488,19 @@ enum AppLocalization {
         in bundle: Bundle
     ) -> Bundle? {
         let identifier = language.localizationIdentifier
+        let cacheKey = "\(bundle.bundleURL.standardizedFileURL.path)|\(identifier)" as NSString
+        if let cached = localizedBundleCache.entry(forKey: cacheKey) {
+            return cached.bundle
+        }
+
         let roots = [bundle, Bundle(for: LocalizationBundleToken.self)]
         for root in roots {
             if let path = root.path(forResource: identifier, ofType: "lproj"),
                let localizedBundle = Bundle(path: path) {
+                localizedBundleCache.insert(
+                    LocalizationBundleCacheEntry(bundle: localizedBundle),
+                    forKey: cacheKey
+                )
                 return localizedBundle
             }
             if let resourceURL = root.resourceURL {
@@ -440,11 +512,39 @@ enum AppLocalization {
                     isDirectory: true
                 )
                 if let localizedBundle = Bundle(url: candidate) {
+                    localizedBundleCache.insert(
+                        LocalizationBundleCacheEntry(bundle: localizedBundle),
+                        forKey: cacheKey
+                    )
                     return localizedBundle
                 }
             }
         }
+        localizedBundleCache.insert(
+            LocalizationBundleCacheEntry(bundle: nil),
+            forKey: cacheKey
+        )
         return nil
+    }
+}
+
+private final class LocalizationBundleCacheEntry: NSObject {
+    let bundle: Bundle?
+
+    init(bundle: Bundle?) {
+        self.bundle = bundle
+    }
+}
+
+private final class LocalizationBundleCache: @unchecked Sendable {
+    private let storage = NSCache<NSString, LocalizationBundleCacheEntry>()
+
+    func entry(forKey key: NSString) -> LocalizationBundleCacheEntry? {
+        storage.object(forKey: key)
+    }
+
+    func insert(_ entry: LocalizationBundleCacheEntry, forKey key: NSString) {
+        storage.setObject(entry, forKey: key)
     }
 }
 

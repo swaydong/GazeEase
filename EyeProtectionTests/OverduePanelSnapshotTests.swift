@@ -72,6 +72,8 @@ final class OverduePanelSnapshotTests: XCTestCase {
     }
 
     func testEveryThemeRendersTheSamePanelGeometry() throws {
+        XCTAssertEqual(ReminderTheme.allCases.count, 9)
+
         for theme in ReminderTheme.allCases {
             let rendered = try renderPanel(
                 fatigueDisplay: "128%",
@@ -87,6 +89,29 @@ final class OverduePanelSnapshotTests: XCTestCase {
             assertCenterIsOpaque(rendered.bitmap)
             try writeScreenshot(rendered.png, named: "top-popup-\(theme.rawValue).png")
         }
+    }
+
+    func testNewThemeBackdropFocusesMatchTheirDefiningSubjects() {
+        XCTAssertEqual(
+            ReminderTheme.mossGardenRain.menuBackdropTreatment.imageAlignment,
+            .bottom
+        )
+        XCTAssertEqual(
+            ReminderTheme.polarNightGlow.menuBackdropTreatment.imageAlignment,
+            .bottom
+        )
+        XCTAssertEqual(
+            ReminderTheme.moonlitBamboo.menuBackdropTreatment.imageAlignment,
+            .top
+        )
+        XCTAssertEqual(
+            ReminderTheme.rainwashedSeaCliff.menuBackdropTreatment.imageAlignment,
+            .bottom
+        )
+        XCTAssertEqual(
+            ReminderTheme.cloudfieldWind.menuBackdropTreatment.imageAlignment,
+            .bottom
+        )
     }
 
     private func renderPanel(
@@ -170,10 +195,7 @@ final class OverduePanelSnapshotTests: XCTestCase {
 
     private func writeScreenshot(_ png: Data, named name: String) throws {
         guard let outputDirectory = screenshotOutputDirectory() else { return }
-        try png.write(
-            to: outputDirectory.appendingPathComponent(name),
-            options: .atomic
-        )
+        try png.write(to: outputDirectory.appendingPathComponent(name))
     }
 
     private func screenshotOutputDirectory() -> URL? {

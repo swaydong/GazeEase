@@ -287,6 +287,39 @@ final class FatigueEngineTests: XCTestCase {
         }
     }
 
+    func testShortSystemRestPreservesLatchAndRecoveredFatigueWhenInterrupted() {
+        for trigger in [
+            RestTrigger.screenLocked,
+            .displayAsleep,
+            .systemSleep,
+        ] {
+            var engine = FatigueEngine()
+            engine.accrueUsage(
+                for: 36 * 60,
+                endingAt: origin.addingTimeInterval(36 * 60)
+            )
+            let restStart = origin.addingTimeInterval(36 * 60)
+            engine.beginRest(trigger: trigger, at: restStart)
+            engine.advanceRest(by: 10, endingAt: restStart.addingTimeInterval(10))
+
+            let events = engine.interruptRest(
+                reason: .cancelled,
+                at: restStart.addingTimeInterval(10)
+            )
+
+            XCTAssertEqual(engine.snapshot.fatiguePercent, 90, accuracy: 0.000_001)
+            XCTAssertTrue(engine.snapshot.restRequired)
+            XCTAssertFalse(engine.isResting)
+            guard case let .restInterrupted(attempt)? = events.first else {
+                return XCTFail("Expected a system rest interruption event")
+            }
+            XCTAssertEqual(attempt.trigger, trigger)
+            XCTAssertEqual(attempt.duration, 10, accuracy: 0.000_001)
+            XCTAssertEqual(attempt.endFatiguePercent, 90, accuracy: 0.000_001)
+            XCTAssertEqual(attempt.outcome, .interrupted(.cancelled))
+        }
+    }
+
     func testUsageDoesNotChangeFatigueUntilActiveRestIsExplicitlyInterrupted() {
         var engine = FatigueEngine()
         engine.accrueUsage(for: 1_200, endingAt: origin.addingTimeInterval(1_200))

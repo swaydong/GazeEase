@@ -186,3 +186,73 @@ final class PresenceEngineTests: XCTestCase {
         )
     }
 }
+
+@MainActor
+final class SystemPresenceMonitorTests: XCTestCase {
+    private let origin = Date(timeIntervalSince1970: 3_000_000)
+
+    func testOverlappingAwaySignalsCannotPublishActiveEarly() {
+        let monitor = SystemPresenceMonitor(
+            activeTransitionDelay: .seconds(60),
+            currentReasonsProvider: { [] }
+        )
+
+        monitor.record(.screensAsleep, active: true, at: origin)
+        monitor.record(.systemSleep, active: true, at: origin.addingTimeInterval(1))
+        monitor.record(.systemSleep, active: false, at: origin.addingTimeInterval(2))
+
+        XCTAssertTrue(monitor.state.isAway)
+        XCTAssertEqual(monitor.state.reason, .screensAsleep)
+
+        monitor.record(.screensAsleep, active: false, at: origin.addingTimeInterval(3))
+        XCTAssertTrue(monitor.state.isAway, "Active publication must be coalesced")
+
+        monitor.completePendingActiveTransition(at: origin.addingTimeInterval(4))
+        XCTAssertFalse(monitor.state.isAway)
+        XCTAssertEqual(monitor.state.reason, .active)
+    }
+
+    func testActiveTransitionRechecksCurrentLockState() {
+        let monitor = SystemPresenceMonitor(
+            activeTransitionDelay: .seconds(60),
+            currentReasonsProvider: { [.sessionInactive] }
+        )
+
+        monitor.record(.screensAsleep, active: true, at: origin)
+        monitor.record(.screensAsleep, active: false, at: origin.addingTimeInterval(1))
+        monitor.completePendingActiveTransition(at: origin.addingTimeInterval(2))
+
+        XCTAssertTrue(monitor.state.isAway)
+        XCTAssertEqual(monitor.state.reason, .sessionInactive)
+    }
+
+    func testStartSeedsAnAlreadyLockedSession() {
+        let monitor = SystemPresenceMonitor(
+            activeTransitionDelay: .seconds(60),
+            currentReasonsProvider: { [.sessionInactive] }
+        )
+
+        monitor.start()
+        XCTAssertTrue(monitor.state.isAway)
+        XCTAssertEqual(monitor.state.reason, .sessionInactive)
+        monitor.stop()
+    }
+
+    func testStaleLockedSnapshotGetsOneBoundedCurrentStateRecheck() {
+        var currentReasons: Set<SystemPresenceMonitor.Reason> = [.sessionInactive]
+        let monitor = SystemPresenceMonitor(
+            activeTransitionDelay: .seconds(60),
+            currentReasonsProvider: { currentReasons }
+        )
+
+        monitor.start()
+        XCTAssertTrue(monitor.state.isAway)
+
+        currentReasons = []
+        monitor.recheckCurrentReasons(at: origin.addingTimeInterval(1))
+
+        XCTAssertFalse(monitor.state.isAway)
+        XCTAssertEqual(monitor.state.reason, .active)
+        monitor.stop()
+    }
+}

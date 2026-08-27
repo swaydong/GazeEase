@@ -8,24 +8,29 @@ described below unless that license explicitly says otherwise.
 
 ## AI-assisted theme artwork / AI 辅助生成主题视觉
 
-The four GazeEase theme families were created specifically for this project
+The nine GazeEase theme families were created specifically for this project
 using AI-assisted image generation together with project-specific art direction,
 selection, editing, cropping, color decisions, and integration:
 
 - Quiet Horizon / 静谧地平线;
 - Forest Light / 林间天光;
 - Alpine Mist / 雪岭晨雾;
-- Twilight Dunes / 暮色沙丘.
+- Twilight Dunes / 暮色沙丘;
+- Moss Garden Rain / 苔庭细雨;
+- Polar Night Glow / 极夜微光;
+- Moonlit Bamboo / 月下竹庭;
+- Rainwashed Sea Cliff / 雨后海崖;
+- Cloudfield Wind / 云野长风.
 
 This policy covers the theme backgrounds and their derived previews and
 screenshots, including files under:
 
-- `EyeProtection/Resources/Assets.xcassets/Rest*.imageset/`;
+- `EyeProtection/Resources/RestBackgrounds/`;
 - `EyeProtection/Resources/Assets.xcassets/Theme*Preview.imageset/`;
 - screenshots or comparison images that reproduce substantial parts of those
   themes.
 
-四套 GazeEase 主题由本项目专门制作，创作过程使用了 AI 辅助图像生成，并结合项目特定的视觉指导、筛选、编辑、裁切、配色与产品整合。本策略覆盖主题背景、主题预览，以及实质性呈现这些主题的截图和对比图。
+九套 GazeEase 主题由本项目专门制作，创作过程使用了 AI 辅助图像生成，并结合项目特定的视觉指导、筛选、编辑、裁切、配色与产品整合。本策略覆盖主题背景、主题预览，以及实质性呈现这些主题的截图和对比图。
 
 ## Rights and limited permission / 权利与有限许可
 

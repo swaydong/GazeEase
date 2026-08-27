@@ -25,12 +25,40 @@ struct RestOverlayWindowAnimation {
     }
 }
 
+enum ReminderPreviewPolicy {
+    static func shouldDismissForRealState(
+        restRequired: Bool,
+        isResting: Bool
+    ) -> Bool {
+        restRequired || isResting
+    }
+}
+
+enum ReminderPanelContentPolicy {
+    static func shouldReplace(
+        hasContent: Bool,
+        current: ReminderPanelPresentation?,
+        updated: ReminderPanelPresentation
+    ) -> Bool {
+        !hasContent || current != updated
+    }
+}
+
+private struct ReminderControllerObservation: Equatable {
+    let restRequired: Bool
+    let isResting: Bool
+    let reminderMode: ReminderMode
+    let promptState: ReminderPromptState
+}
+
 @MainActor
 final class OverduePanelController {
     private let model: AppModel
     private let panel: NonActivatingReminderPanel
     private var cancellables = Set<AnyCancellable>()
     private var presentation: ReminderPanelPresentation?
+    private var previewDismissTask: Task<Void, Never>?
+    private var isShowingPreview = false
 
     init(model: AppModel) {
         self.model = model
@@ -52,7 +80,11 @@ final class OverduePanelController {
     }
 
     func show(_ updatedPresentation: ReminderPanelPresentation) {
-        if panel.contentView == nil || updatedPresentation != presentation {
+        if ReminderPanelContentPolicy.shouldReplace(
+            hasContent: panel.contentView != nil,
+            current: presentation,
+            updated: updatedPresentation
+        ) {
             presentation = updatedPresentation
             panel.contentView = NSHostingView(
                 rootView: OverduePanelView(
@@ -67,8 +99,70 @@ final class OverduePanelController {
     }
 
     func hide() {
+        previewDismissTask?.cancel()
+        previewDismissTask = nil
+        isShowingPreview = false
         panel.orderOut(nil)
         presentation = nil
+        panel.contentView = nil
+    }
+
+    func showPreview(duration: TimeInterval = 6) {
+        guard model.canShowTestReminderPreview else { return }
+
+        previewDismissTask?.cancel()
+        isShowingPreview = true
+
+        let previewPresentation = ReminderPanelPresentation()
+        presentation = previewPresentation
+        installPreviewContent(presentation: previewPresentation)
+        positionPanel()
+        panel.orderFrontRegardless()
+
+        previewDismissTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(max(1, duration)))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            self?.hidePreview()
+        }
+    }
+
+    private func installPreviewContent(
+        presentation previewPresentation: ReminderPanelPresentation
+    ) {
+        let closePreview: () -> Void = { [weak self] in
+            self?.hidePreview()
+        }
+        panel.contentView = NSHostingView(
+            rootView: OverduePanelScene(
+                fatigueDisplay: AppLocalization.fatiguePercent(
+                    100,
+                    language: model.resolvedLanguage
+                ),
+                overloadDuration: 0,
+                presentation: previewPresentation,
+                theme: model.reminderTheme,
+                language: model.resolvedLanguage,
+                onContinueWorking: closePreview,
+                onBeginRest: closePreview
+            )
+        )
+    }
+
+    private func hidePreview() {
+        guard isShowingPreview else { return }
+        previewDismissTask?.cancel()
+        previewDismissTask = nil
+        isShowingPreview = false
+        update(
+            restRequired: model.restRequired,
+            isResting: model.isResting,
+            reminderMode: model.reminderMode,
+            promptState: model.reminderPromptState
+        )
     }
 
     private func configurePanel() {
@@ -95,25 +189,42 @@ final class OverduePanelController {
             model.$reminderMode,
             model.$reminderPromptState
         )
+        .map { restRequired, isResting, reminderMode, promptState in
+            ReminderControllerObservation(
+                restRequired: restRequired,
+                isResting: isResting,
+                reminderMode: reminderMode,
+                promptState: promptState
+            )
+        }
+        .removeDuplicates()
         .receive(on: RunLoop.main)
-        .sink { [weak self] restRequired, isResting, reminderMode, promptState in
+        .sink { [weak self] observation in
             Task { @MainActor [weak self] in
                 self?.update(
-                    restRequired: restRequired,
-                    isResting: isResting,
-                    reminderMode: reminderMode,
-                    promptState: promptState
+                    restRequired: observation.restRequired,
+                    isResting: observation.isResting,
+                    reminderMode: observation.reminderMode,
+                    promptState: observation.promptState
                 )
             }
         }
         .store(in: &cancellables)
 
-        model.$reminderTheme
+        Publishers.CombineLatest(model.$reminderTheme, model.$appLanguage)
             .dropFirst()
+            .removeDuplicates { previous, updated in
+                previous.0 == updated.0 && previous.1 == updated.1
+            }
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
+            .sink { [weak self] _, _ in
                 Task { @MainActor [weak self] in
-                    guard let self, let presentation = self.presentation else { return }
+                    guard let self,
+                          let presentation = self.presentation else { return }
+                    if self.isShowingPreview {
+                        self.installPreviewContent(presentation: presentation)
+                        return
+                    }
                     self.panel.contentView = NSHostingView(
                         rootView: OverduePanelView(
                             model: self.model,
@@ -141,6 +252,21 @@ final class OverduePanelController {
         reminderMode: ReminderMode,
         promptState: ReminderPromptState
     ) {
+        if isShowingPreview {
+            guard ReminderPreviewPolicy.shouldDismissForRealState(
+                restRequired: restRequired,
+                isResting: isResting
+            ) else { return }
+            previewDismissTask?.cancel()
+            previewDismissTask = nil
+            isShowingPreview = false
+            // Preview and real panels currently have the same value-only
+            // presentation. Invalidate the cached view so live values and real
+            // callbacks are always installed after the preview retires.
+            presentation = nil
+            panel.contentView = nil
+        }
+
         guard let presentation = ReminderPresentationPolicy.panel(
             restRequired: restRequired,
             isResting: isResting,
@@ -187,6 +313,7 @@ final class RestOverlayController {
         update(
             restRequired: model.restRequired,
             isResting: model.isResting,
+            activeRestTrigger: model.activeRestTrigger,
             reminderMode: model.reminderMode,
             promptState: model.reminderPromptState
         )
@@ -217,14 +344,25 @@ final class RestOverlayController {
             model.$reminderMode,
             model.$reminderPromptState
         )
+        .map { restRequired, isResting, reminderMode, promptState in
+            ReminderControllerObservation(
+                restRequired: restRequired,
+                isResting: isResting,
+                reminderMode: reminderMode,
+                promptState: promptState
+            )
+        }
+        .removeDuplicates()
         .receive(on: RunLoop.main)
-        .sink { [weak self] restRequired, isResting, reminderMode, promptState in
+        .sink { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.update(
-                    restRequired: restRequired,
-                    isResting: isResting,
-                    reminderMode: reminderMode,
-                    promptState: promptState
+                guard let self else { return }
+                self.update(
+                    restRequired: self.model.restRequired,
+                    isResting: self.model.isResting,
+                    activeRestTrigger: self.model.activeRestTrigger,
+                    reminderMode: self.model.reminderMode,
+                    promptState: self.model.reminderPromptState
                 )
             }
         }
@@ -232,6 +370,7 @@ final class RestOverlayController {
 
         model.$reminderTheme
             .dropFirst()
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 MainActor.assumeIsolated {
@@ -253,12 +392,14 @@ final class RestOverlayController {
     private func update(
         restRequired: Bool,
         isResting: Bool,
+        activeRestTrigger: RestTrigger?,
         reminderMode: ReminderMode,
         promptState: ReminderPromptState
     ) {
         guard let overlayPhase = ReminderPresentationPolicy.overlay(
             restRequired: restRequired,
             isResting: isResting,
+            activeRestTrigger: activeRestTrigger,
             promptState: promptState,
             reminderMode: reminderMode
         ) else {
@@ -290,6 +431,23 @@ final class RestOverlayController {
 
     private func rebuildForCurrentScreens() {
         guard let mode = presentedMode else { return }
+        let currentPhase = ReminderPresentationPolicy.overlay(
+            restRequired: model.restRequired,
+            isResting: model.isResting,
+            activeRestTrigger: model.activeRestTrigger,
+            promptState: model.reminderPromptState,
+            reminderMode: model.reminderMode
+        )
+        let currentMode = currentPhase.map { phase in
+            switch phase {
+            case .decision: RestOverlayMode.decision
+            case .resting: RestOverlayMode.resting
+            }
+        }
+        guard currentMode == mode else {
+            hide()
+            return
+        }
 
         let outgoingPanels = Array(panels.values)
         panels.removeAll()
@@ -379,7 +537,10 @@ final class RestOverlayController {
             reduceMotion: reduceMotion
         )
         guard duration > 0 else {
-            outgoingPanels.forEach { $0.orderOut(nil) }
+            outgoingPanels.forEach { panel in
+                panel.orderOut(nil)
+                panel.contentView = nil
+            }
             return
         }
 
@@ -388,7 +549,10 @@ final class RestOverlayController {
             outgoingPanels.forEach { $0.animator().alphaValue = 0 }
         } completionHandler: {
             MainActor.assumeIsolated {
-                outgoingPanels.forEach { $0.orderOut(nil) }
+                outgoingPanels.forEach { panel in
+                    panel.orderOut(nil)
+                    panel.contentView = nil
+                }
             }
         }
     }

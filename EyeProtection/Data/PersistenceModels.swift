@@ -7,12 +7,19 @@ final class FatigueSampleRecord {
     var timestamp: Date
     var fatigue: Double
     var presenceState: String
+    var isBucketLatest: Bool?
 
-    init(timestamp: Date, fatigue: Double, presenceState: String) {
+    init(
+        timestamp: Date,
+        fatigue: Double,
+        presenceState: String,
+        isBucketLatest: Bool? = nil
+    ) {
         self.id = UUID()
         self.timestamp = timestamp
         self.fatigue = fatigue
         self.presenceState = presenceState
+        self.isBucketLatest = isBucketLatest
     }
 }
 
@@ -47,6 +54,7 @@ final class RestAttemptRecord {
     var interruptionReason: String?
 
     init(
+        id: UUID = UUID(),
         overloadEpisodeID: UUID?,
         startedAt: Date,
         endedAt: Date,
@@ -56,7 +64,7 @@ final class RestAttemptRecord {
         outcome: String,
         interruptionReason: String?
     ) {
-        self.id = UUID()
+        self.id = id
         self.overloadEpisodeID = overloadEpisodeID
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -99,12 +107,21 @@ final class DailySummaryRecord {
     }
 }
 
+struct PendingRestAttempt: Codable, Sendable, Equatable, Identifiable {
+    var attempt: RestAttempt
+    var overloadEpisodeID: UUID?
+
+    var id: UUID { attempt.id }
+}
+
 struct PersistedRuntimeState: Codable, Sendable {
     var fatigue: Double
     var restRequired: Bool
     var overloadStartedAt: Date?
     var overloadEpisodeID: UUID?
     var continuousUsageDuration: TimeInterval
+    var activeRest: ActiveRestSession? = nil
+    var pendingRestAttempts: [PendingRestAttempt]? = nil
     var reminderPromptState: ReminderPromptState? = nil
     var reminderDecisionPending: Bool? = nil
     var lastInactivityRestCompletedAt: Date? = nil

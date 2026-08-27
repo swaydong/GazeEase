@@ -7,6 +7,7 @@ build/
 Dist/
 Release/
 Preview/
+Design/ThemeSources/
 design-qa.md
 *.xcarchive
 *.xcresult

@@ -1,0 +1,66 @@
+GazeEase Private Test Build — Installation Guide
+Version 1.1.0 (Build 37)
+
+Important
+
+This is an Apple Development-signed test build sent directly by the developer. It has not been notarized by Apple and is not a public release.
+Install it only if you received the ZIP directly from the developer and its SHA-256 checksum matches. Do not redistribute it.
+
+1. Install
+
+1. Extract the ZIP completely.
+2. Open the extracted folder.
+3. Drag GazeEase.app into the Applications folder.
+4. Double-click GazeEase from Applications.
+
+2. If macOS blocks the first launch
+
+1. If macOS says the developer cannot be verified or Apple cannot check the app for malicious software, dismiss the alert.
+2. Open System Settings → Privacy & Security.
+3. Scroll down to Security and find the blocked GazeEase entry.
+4. Click Open Anyway, enter your Mac login password, then click Open again.
+
+Open Anyway is normally available for about one hour after the first launch attempt. If it is not shown, try opening GazeEase again, then return to Privacy & Security.
+
+If macOS says the app “is damaged” or “will damage your computer,” do not continue. Delete that copy and send a screenshot of the complete alert to the developer.
+
+Apple's official instructions:
+https://support.apple.com/guide/mac-help/open-an-app-by-overriding-security-settings-mh40617/mac
+
+3. Allow Input Monitoring
+
+GazeEase uses Input Monitoring to determine whether the computer is active and whether a rest session has been interrupted.
+
+1. Select Allow in the GazeEase onboarding flow, or open System Settings → Privacy & Security → Input Monitoring.
+2. Enable GazeEase.
+3. Quit GazeEase completely, then reopen it from Applications.
+
+A Mac restart is not normally required. If GazeEase still reports that permission is missing, turn off any old GazeEase entry and authorize it again. Restart the Mac once only if permission still does not take effect.
+
+GazeEase does not require Screen Recording. It does not save typed content, pointer coordinates, or screen images. Analytics remain on the Mac.
+
+4. Upgrade
+
+1. Quit the current version of GazeEase.
+2. Extract the new package sent by the developer.
+3. Drag the new GazeEase.app into Applications and choose Replace when prompted.
+4. Reopen GazeEase.
+
+Preferences, fatigue history, and theme settings should remain. If macOS requests Open Anyway or Input Monitoring again, repeat the steps above.
+
+5. Uninstall
+
+1. Turn off Launch at Login in GazeEase Settings.
+2. Quit GazeEase.
+3. Move GazeEase.app from Applications to Trash.
+4. If needed, remove any remaining item under System Settings → General → Login Items and disable GazeEase under Privacy & Security → Input Monitoring.
+
+Removing the app does not automatically delete preferences or fatigue history. To remove analytics, use Clear All Analytics Data inside the app before uninstalling.
+
+Known limitations
+
+- Every Mac may require a manual Open Anyway confirmation, and a later build may require it again.
+- A company- or school-managed Mac may block Open Anyway or Input Monitoring.
+- There is no automatic update; upgrades are installed manually.
+- The developer may need to provide a new build if the development signing expires or is revoked.
+- Requires macOS 14 or later. Both Apple silicon and Intel Macs are supported.

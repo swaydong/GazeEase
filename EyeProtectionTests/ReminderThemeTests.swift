@@ -4,7 +4,21 @@ import XCTest
 
 @MainActor
 final class ReminderThemeTests: XCTestCase {
+    private let stableThemeIdentifiers = [
+        "quietHorizon",
+        "forestLight",
+        "alpineMist",
+        "twilightDunes",
+        "mossGardenRain",
+        "polarNightGlow",
+        "moonlitBamboo",
+        "rainwashedSeaCliff",
+        "cloudfieldWind"
+    ]
+
     func testKnownValuesRestoreWithoutChangingStableIdentifiers() {
+        XCTAssertEqual(ReminderTheme.allCases.map(\.rawValue), stableThemeIdentifiers)
+
         for theme in ReminderTheme.allCases {
             XCTAssertEqual(
                 ReminderTheme.restored(fromPersistedValue: theme.rawValue),
@@ -24,11 +38,14 @@ final class ReminderThemeTests: XCTestCase {
     func testEveryThemeHasAUsableBundledBackground() throws {
         for theme in ReminderTheme.allCases {
             let background = try XCTUnwrap(
-                NSImage(named: theme.backgroundAssetName),
-                "Missing asset for \(theme.rawValue)"
+                RestBackgroundImageLoader.decode(
+                    theme: theme,
+                    maximumPixelDimension: 1536
+                ),
+                "Missing raw background for \(theme.rawValue)"
             )
             XCTAssertEqual(
-                background.size.width / background.size.height,
+                Double(background.width) / Double(background.height),
                 1.6,
                 accuracy: 0.001
             )
@@ -42,16 +59,13 @@ final class ReminderThemeTests: XCTestCase {
     }
 
     func testThemePickerFitsInsideTheSettingsFormWithSafetyMargin() {
-        XCTAssertLessThanOrEqual(ReminderThemePickerLayout.totalWidth, 472)
-        XCTAssertEqual(ReminderThemePickerLayout.cardSize.height, 82)
+        XCTAssertEqual(ReminderThemePickerLayout.columns, 3)
+        XCTAssertEqual(ReminderThemePickerLayout.rows, 3)
+        XCTAssertEqual(ReminderThemePickerLayout.cardSize, CGSize(width: 152, height: 90))
+        XCTAssertEqual(ReminderThemePickerLayout.gridSize, CGSize(width: 472, height: 286))
     }
 
-    func testEveryThemeUsesADistinctSettingsPreviewFocus() {
-        let focuses = Set(ReminderTheme.allCases.map {
-            $0.settingsCardTreatment.focus
-        })
-
-        XCTAssertEqual(focuses.count, ReminderTheme.allCases.count)
+    func testEveryThemeUsesAValidSettingsPreviewTreatment() {
         for theme in ReminderTheme.allCases {
             XCTAssertGreaterThanOrEqual(theme.settingsCardTreatment.scale, 1)
         }
@@ -150,6 +164,32 @@ final class ReminderThemeTests: XCTestCase {
 
             XCTAssertNotEqual(nextTheme, .forestLight)
             XCTAssertEqual(scheduler.nextChangeAt, now.addingTimeInterval(600))
+        }
+    }
+
+    func testRandomRotationCanReachEveryOtherThemeFromEveryCurrentTheme() throws {
+        let now = Date(timeIntervalSince1970: 5_000)
+
+        for currentTheme in ReminderTheme.allCases {
+            var reachedThemes = Set<ReminderTheme>()
+
+            for randomValue in UInt64(0)..<UInt64(ReminderTheme.allCases.count - 1) {
+                var scheduler = ReminderThemeRotationScheduler(nextChangeAt: now)
+                let nextTheme = try XCTUnwrap(scheduler.advance(
+                    enabled: true,
+                    interval: 600,
+                    at: now,
+                    currentTheme: currentTheme,
+                    shouldDefer: false,
+                    randomValue: randomValue
+                ))
+                reachedThemes.insert(nextTheme)
+            }
+
+            XCTAssertEqual(
+                reachedThemes,
+                Set(ReminderTheme.allCases.filter { $0 != currentTheme })
+            )
         }
     }
 

@@ -3,6 +3,176 @@ import Combine
 import Foundation
 import OSLog
 
+enum AnalyticsRefreshPolicy {
+    static func shouldRefresh(
+        lastRefreshAt: Date?,
+        now: Date,
+        maxAge: TimeInterval,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let lastRefreshAt else { return true }
+        guard calendar.isDate(lastRefreshAt, inSameDayAs: now) else {
+            return true
+        }
+        let age = now.timeIntervalSince(lastRefreshAt)
+        return age < 0 || age >= max(0, maxAge)
+    }
+}
+
+enum AnalyticsSamplingPolicy {
+    static let persistenceInterval: TimeInterval = 5 * 60
+
+    static func shouldFlush(
+        lastFlushAt: Date?,
+        now: Date,
+        force: Bool,
+        interval: TimeInterval = persistenceInterval
+    ) -> Bool {
+        if force { return true }
+        guard let lastFlushAt else { return true }
+        let elapsed = now.timeIntervalSince(lastFlushAt)
+        return elapsed < 0 || elapsed >= max(0, interval)
+    }
+
+    static func shouldCommitUsageSessionEnd(tailFlushSucceeded: Bool) -> Bool {
+        tailFlushSucceeded
+    }
+}
+
+enum AppModelPublicationPolicy {
+    static func shouldPublishFatigue(current: Double, updated: Double) -> Bool {
+        let normalizedCurrent = current.isFinite ? max(0, current) : 0
+        let normalizedUpdated = updated.isFinite ? max(0, updated) : 0
+        if normalizedUpdated == 0, normalizedCurrent != 0 {
+            return true
+        }
+        return fatigueBucket(current) != fatigueBucket(updated)
+    }
+
+    static func shouldPublishDuration(
+        current: TimeInterval,
+        updated: TimeInterval
+    ) -> Bool {
+        let normalizedCurrent = current.isFinite ? max(0, current) : 0
+        let normalizedUpdated = updated.isFinite ? max(0, updated) : 0
+        if normalizedUpdated == 0, normalizedCurrent != 0 {
+            return true
+        }
+        return durationBucket(current) != durationBucket(updated)
+    }
+
+    private enum FatigueBucket: Equatable {
+        case percent(Int)
+        case compactTenth(Int)
+    }
+
+    private static func fatigueBucket(_ fatigue: Double) -> FatigueBucket {
+        let value = fatigue.isFinite ? max(0, fatigue) : 0
+        if value <= 999 {
+            let displayedValue = value < 100 ? value.rounded(.down) : value.rounded()
+            return .percent(Int(displayedValue))
+        }
+        return .compactTenth(Int((value / 100).rounded()))
+    }
+
+    private static func durationBucket(_ duration: TimeInterval) -> Int {
+        let seconds = duration.isFinite ? max(0, Int(duration.rounded())) : 0
+        return seconds < 60 ? seconds : 60 + seconds / 60
+    }
+}
+
+enum RestRuntimePolicy {
+    static func restoredPromptState(from runtime: PersistedRuntimeState?) -> ReminderPromptState {
+        guard runtime?.restRequired == true else { return .hidden }
+        if runtime?.activeRest != nil {
+            return .manualRetry
+        }
+        if runtime?.reminderPromptState == nil,
+           runtime?.reminderDecisionPending == nil {
+            return .initialDecision
+        }
+        let restored = ReminderPromptState.restored(
+            savedState: runtime?.reminderPromptState,
+            legacyDecisionPending: runtime?.reminderDecisionPending
+        )
+        return restored
+    }
+
+    static func shouldIgnoreInput(systemAway: Bool) -> Bool {
+        systemAway
+    }
+
+    static func shouldInterruptForUnavailableMonitoring(
+        activeRestTrigger: RestTrigger?,
+        inputPermissionGranted: Bool,
+        inputMonitorRunning: Bool
+    ) -> Bool {
+        activeRestTrigger == .manual &&
+            (!inputPermissionGranted || !inputMonitorRunning)
+    }
+
+    static func promptStateAfterInterruptedSystemRest(
+        restRequired: Bool
+    ) -> ReminderPromptState {
+        restRequired ? .manualRetry : .hidden
+    }
+
+    static func interruptedAttemptForRecovery(
+        from runtime: PersistedRuntimeState?
+    ) -> RestAttempt? {
+        guard let runtime, let activeRest = runtime.activeRest else { return nil }
+        let duration = activeRest.elapsed.isFinite ? max(0, activeRest.elapsed) : 0
+        let endFatigue = runtime.fatigue.isFinite ? max(0, runtime.fatigue) : 0
+        return RestAttempt(
+            id: activeRest.id,
+            trigger: activeRest.trigger,
+            startedAt: activeRest.startedAt,
+            endedAt: activeRest.startedAt.addingTimeInterval(duration),
+            startFatiguePercent: activeRest.startFatiguePercent,
+            duration: duration,
+            endFatiguePercent: endFatigue,
+            outcome: .interrupted(.cancelled)
+        )
+    }
+}
+
+enum RestAttemptOutboxPolicy {
+    static func normalized(_ attempts: [PendingRestAttempt]) -> [PendingRestAttempt] {
+        var seen = Set<UUID>()
+        return attempts.filter { seen.insert($0.id).inserted }
+    }
+
+    @discardableResult
+    static func enqueue(
+        _ pendingAttempt: PendingRestAttempt,
+        into attempts: inout [PendingRestAttempt]
+    ) -> Bool {
+        guard !attempts.contains(where: { $0.id == pendingAttempt.id }) else {
+            return false
+        }
+        attempts.append(pendingAttempt)
+        return true
+    }
+
+    static func discardAll(_ attempts: inout [PendingRestAttempt]) {
+        attempts.removeAll(keepingCapacity: false)
+    }
+
+    @discardableResult
+    static func drain(
+        _ attempts: inout [PendingRestAttempt],
+        persist: (PendingRestAttempt) -> Bool
+    ) -> Bool {
+        var removedAttempt = false
+        while let pendingAttempt = attempts.first,
+              persist(pendingAttempt) {
+            attempts.removeFirst()
+            removedAttempt = true
+        }
+        return removedAttempt
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     private static var isRunningTests: Bool {
@@ -66,6 +236,10 @@ final class AppModel: ObservableObject {
         return fatigueEngine.restRemaining
     }
 
+    var activeRestTrigger: RestTrigger? {
+        fatigueEngine.snapshot.activeRest?.trigger
+    }
+
     private static let logger = Logger(subsystem: "com.local.EyeProtection", category: "AppModel")
 
     private let eventStore: EventStore
@@ -90,8 +264,11 @@ final class AppModel: ObservableObject {
     )
     private var lastTickAt: Date?
     private var lastPersistenceAt: Date?
+    private var lastAnalyticsSampleFlushAt: Date?
+    private var lastAnalyticsRefreshAt: Date?
     private var restInputGraceUntil: Date?
     private var ticker: Timer?
+    private var analyticsMaintenanceTask: Task<Void, Never>?
     private var isStarted = false
     private var nextInputMonitorRetryAt = Date.distantPast
     private var inputMonitorRetryDelay: TimeInterval = 2
@@ -100,6 +277,7 @@ final class AppModel: ObservableObject {
     private var pendingNativeReminderMultiple: Int?
     private var shouldDelayThemeRotationForSurfaceRetirement = false
     private var themeRotationSurfaceRetirementTask: Task<Void, Never>?
+    private var pendingRestAttempts: [PendingRestAttempt]
 
     private lazy var overduePanelController = OverduePanelController(model: self)
     private lazy var restOverlayController = RestOverlayController(model: self)
@@ -116,7 +294,50 @@ final class AppModel: ObservableObject {
         } else {
             store = EventStore.makeDefault()
         }
-        let runtime = store.loadRuntimeState()
+        var runtime = store.loadRuntimeState()
+        let restoredPendingAttempts = runtime?.pendingRestAttempts ?? []
+        var pendingRestAttempts = RestAttemptOutboxPolicy.normalized(
+            restoredPendingAttempts
+        )
+        var runtimeNeedsSave = pendingRestAttempts.count != restoredPendingAttempts.count
+        let interruptedAttempt = RestRuntimePolicy.interruptedAttemptForRecovery(
+            from: runtime
+        )
+        var pendingAttemptsAreDurable = true
+        if let interruptedAttempt {
+            RestAttemptOutboxPolicy.enqueue(
+                PendingRestAttempt(
+                    attempt: interruptedAttempt,
+                    overloadEpisodeID: runtime?.overloadEpisodeID
+                ),
+                into: &pendingRestAttempts
+            )
+            if var normalizedRuntime = runtime {
+                normalizedRuntime.activeRest = nil
+                normalizedRuntime.reminderPromptState = normalizedRuntime.restRequired
+                    ? .manualRetry
+                    : .hidden
+                normalizedRuntime.reminderDecisionPending = normalizedRuntime.restRequired
+                normalizedRuntime.pendingRestAttempts = pendingRestAttempts
+                normalizedRuntime.savedAt = Date()
+                pendingAttemptsAreDurable = store.saveRuntimeState(normalizedRuntime)
+                runtime = normalizedRuntime
+                runtimeNeedsSave = false
+            }
+        }
+        let persistedPendingAttempts = pendingAttemptsAreDurable
+            ? RestAttemptOutboxPolicy.drain(
+                &pendingRestAttempts
+            ) { pendingAttempt in
+                Self.persist(pendingAttempt, to: store)
+            }
+            : false
+        if (runtimeNeedsSave || persistedPendingAttempts), var normalizedRuntime = runtime {
+            normalizedRuntime.pendingRestAttempts = pendingRestAttempts
+            normalizedRuntime.savedAt = Date()
+            store.saveRuntimeState(normalizedRuntime)
+            runtime = normalizedRuntime
+        }
         let configuredWorkMinutes = Preferences.workMinutes
         let configuredRestSeconds = Preferences.restSeconds
         let configuredInactivityRestEnabled = Preferences.inactivityRestEnabled
@@ -187,15 +408,13 @@ final class AppModel: ObservableObject {
         self.restSeconds = configuredRestSeconds
         self.inactivityRestEnabled = configuredInactivityRestEnabled
         self.inactivityRestMinutes = configuredInactivityRestMinutes
-        self.reminderPromptState = ReminderPromptState.restored(
-            savedState: runtime?.reminderPromptState,
-            legacyDecisionPending: runtime?.reminderDecisionPending
-        )
+        self.reminderPromptState = RestRuntimePolicy.restoredPromptState(from: runtime)
         self.notificationPermissionDenied = false
         self.randomThemeRotationEnabled = configuredRandomThemeRotationEnabled
         self.randomThemeRotationIntervalMinutes = configuredRandomThemeRotationIntervalMinutes
         self.reminderTheme = Preferences.reminderTheme
         self.reminderMode = Preferences.reminderMode
+        self.pendingRestAttempts = pendingRestAttempts
 
         if let episode = overloadEpisode, overloadID == nil {
             activeOverloadEpisodeID = store.beginOverload(
@@ -214,7 +433,9 @@ final class AppModel: ObservableObject {
         configureCallbacks()
         permissionCenter.startObserving()
         systemMonitor.start()
-        eventStore.cleanExpiredData()
+        if eventStore.cleanExpiredData() {
+            startAnalyticsMaintenancePump()
+        }
         refreshAnalytics()
 
         _ = overduePanelController
@@ -248,6 +469,8 @@ final class AppModel: ObservableObject {
     func stop() {
         guard isStarted else { return }
         isStarted = false
+        analyticsMaintenanceTask?.cancel()
+        analyticsMaintenanceTask = nil
         cancelThemeRotationSurfaceRetirement()
         persist(at: Date(), force: true)
         ticker?.invalidate()
@@ -295,7 +518,15 @@ final class AppModel: ObservableObject {
     }
 
     func refreshMonitoringStatus() {
+        nextInputMonitorRetryAt = .distantPast
+        inputMonitorRetryDelay = 2
         updatePermissions(permissionCenter.refresh())
+    }
+
+    func repairInputMonitoring() {
+        refreshMonitoringStatus()
+        guard !isMonitoringComplete else { return }
+        openInputMonitoringSettings()
     }
 
     func openNotificationSettings() {
@@ -308,7 +539,13 @@ final class AppModel: ObservableObject {
     func setWorkMinutes(_ minutes: Int) {
         guard !fatigueEngine.isResting else { return }
         let normalized = Preferences.normalizedWorkMinutes(minutes)
+        guard normalized != workMinutes else { return }
         let now = Date()
+        flushAnalyticsSample(
+            at: now,
+            presenceState: presenceEngine.state,
+            elapsed: lastPersistenceAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+        )
         guard let events = fatigueEngine.updateDurations(
             usageDurationForOneHundredPercent: TimeInterval(normalized * 60),
             requiredContinuousRestDuration: TimeInterval(restSeconds),
@@ -333,14 +570,33 @@ final class AppModel: ObservableObject {
         refreshPresenceDescription()
     }
 
-    func completeOnboarding() {
-        guard !onboardingCompleted else { return }
-        onboardingCompleted = true
-        Preferences.onboardingCompleted = true
+    @discardableResult
+    func completeOnboarding() -> Bool {
+        guard inputPermissionGranted, isMonitoringComplete else { return false }
+        if !onboardingCompleted {
+            onboardingCompleted = true
+            Preferences.onboardingCompleted = true
+        }
+        return true
     }
 
     func showOnboarding() {
         onboardingWindowController.show()
+    }
+
+    func openInputMonitoringSettings() {
+        openPrivacySettings(anchor: "Privacy_ListenEvent")
+    }
+
+    func showTestReminderPreview() {
+        guard canShowTestReminderPreview else { return }
+        overduePanelController.showPreview()
+    }
+
+    var canShowTestReminderPreview: Bool {
+        isMonitoringComplete &&
+            !fatigueEngine.isResting &&
+            !fatigueEngine.snapshot.restRequired
     }
 
     func setRestSeconds(_ seconds: Int) {
@@ -419,13 +675,32 @@ final class AppModel: ObservableObject {
     }
 
     func clearData() {
-        eventStore.clearAll()
+        guard eventStore.clearAll() else { return }
+        RestAttemptOutboxPolicy.discardAll(&pendingRestAttempts)
+        lastAnalyticsSampleFlushAt = nil
         persist(at: Date(), force: true)
         refreshAnalytics()
     }
 
     func refreshAnalytics() {
-        analytics = eventStore.analytics()
+        refreshAnalytics(at: Date())
+    }
+
+    func refreshAnalytics(at now: Date) {
+        analytics = eventStore.analytics(now: now)
+        lastAnalyticsRefreshAt = now
+    }
+
+    func refreshAnalyticsIfNeeded(
+        at now: Date = Date(),
+        maxAge: TimeInterval = 60
+    ) {
+        guard AnalyticsRefreshPolicy.shouldRefresh(
+            lastRefreshAt: lastAnalyticsRefreshAt,
+            now: now,
+            maxAge: maxAge
+        ) else { return }
+        refreshAnalytics(at: now)
     }
 
     func quit() {
@@ -454,15 +729,13 @@ final class AppModel: ObservableObject {
     }
 
     private func handleInput(_ event: InputActivityMonitor.Event) {
+        guard !RestRuntimePolicy.shouldIgnoreInput(
+            systemAway: systemPresenceState.isAway
+        ) else { return }
+
         pendingInput = true
 
         guard fatigueEngine.isResting else {
-            return
-        }
-
-        if systemPresenceState.isAway {
-            process(fatigueEngine.interruptRest(reason: .monitoringUnavailable, at: event.timestamp))
-            publish(at: event.timestamp)
             return
         }
 
@@ -490,17 +763,33 @@ final class AppModel: ObservableObject {
         let wasAway = systemPresenceState.isAway
 
         if wasAway, !state.isAway {
-            let permissions = permissionCenter.refresh()
-            if permissions.inputMonitoring != .authorized {
-                process(fatigueEngine.interruptRest(reason: .monitoringUnavailable, at: state.timestamp))
-            }
             // Account for timer suspension while the Mac was asleep before ending rest.
             tick(at: state.timestamp, allowLongInterval: true)
+            systemPresenceState = state
+
+            if fatigueEngine.isResting {
+                let events = fatigueEngine.interruptRest(
+                    reason: .cancelled,
+                    at: state.timestamp
+                )
+                reminderPromptState = RestRuntimePolicy.promptStateAfterInterruptedSystemRest(
+                    restRequired: fatigueEngine.snapshot.restRequired
+                )
+                process(events)
+                publish(at: state.timestamp)
+                persist(at: state.timestamp, force: true)
+            }
+            return
         }
 
-        systemPresenceState = state
-
         if !wasAway, state.isAway {
+            // PresenceEngine must observe the away state before the final usage
+            // sample is recorded, otherwise the previous session can remain open
+            // until the Mac wakes again.
+            systemPresenceState = state
+            // End the active usage segment immediately instead of waiting for the
+            // next timer sample after the screen has already locked or gone to sleep.
+            tick(at: state.timestamp)
             let trigger: RestTrigger = switch state.reason {
             case .systemSleep: .systemSleep
             case .screensAsleep: .displayAsleep
@@ -511,10 +800,11 @@ final class AppModel: ObservableObject {
             lastTickAt = state.timestamp
             restInputGraceUntil = nil
             publish(at: state.timestamp)
-        } else if wasAway, !state.isAway, fatigueEngine.isResting {
-            process(fatigueEngine.interruptRest(reason: .cancelled, at: state.timestamp))
-            publish(at: state.timestamp)
+            persist(at: state.timestamp, force: true)
+            return
         }
+
+        systemPresenceState = state
     }
 
     private func tick(at now: Date, allowLongInterval: Bool = false) {
@@ -541,14 +831,32 @@ final class AppModel: ObservableObject {
             systemState: domainSystemState
         )
         pendingInput = false
+        let previousPresenceState = presenceEngine.state
         let presenceUpdate = presenceEngine.ingest(sample)
+        var endedUsageSession = false
+        for event in presenceUpdate.events {
+            guard case let .sessionEnded(at, _) = event else { continue }
+            let tailFlushSucceeded = flushAnalyticsSample(
+                at: at,
+                presenceState: previousPresenceState,
+                elapsed: lastPersistenceAt.map { max(0, at.timeIntervalSince($0)) } ?? 0
+            )
+            if AnalyticsSamplingPolicy.shouldCommitUsageSessionEnd(
+                tailFlushSucceeded: tailFlushSucceeded
+            ) {
+                eventStore.recordUsageSessionEnded(at: at)
+            }
+            continuousUsageDuration = 0
+            endedUsageSession = true
+        }
         var completedInactivityRest = false
 
         if fatigueEngine.isResting {
-            if let activeRest = fatigueEngine.snapshot.activeRest,
-               !monitoringPermissionsGranted ||
-               (activeRest.trigger == .manual &&
-                   !inputMonitor.isRunning) {
+            if RestRuntimePolicy.shouldInterruptForUnavailableMonitoring(
+                activeRestTrigger: fatigueEngine.snapshot.activeRest?.trigger,
+                inputPermissionGranted: monitoringPermissionsGranted,
+                inputMonitorRunning: inputMonitor.isRunning
+            ) {
                 process(fatigueEngine.interruptRest(reason: .monitoringUnavailable, at: now))
             } else {
                 process(fatigueEngine.advanceRest(by: elapsed, endingAt: now))
@@ -566,6 +874,11 @@ final class AppModel: ObservableObject {
                 isResting: false
             ) {
                 let qualifyingDuration = TimeInterval(inactivityRestMinutes * 60)
+                flushAnalyticsSample(
+                    at: now,
+                    presenceState: presenceUpdate.state,
+                    elapsed: lastPersistenceAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+                )
                 process(fatigueEngine.completeConfirmedRest(
                     trigger: .inactivity,
                     qualifyingDuration: qualifyingDuration,
@@ -582,13 +895,14 @@ final class AppModel: ObservableObject {
         }
 
         publish(at: now, presenceState: presenceEngine.state)
-        persist(at: now, force: completedInactivityRest)
+        persist(at: now, force: completedInactivityRest || endedUsageSession)
         if completedInactivityRest {
             refreshAnalytics()
         }
     }
 
     private func process(_ events: [FatigueEvent]) {
+        var latestRestAttemptEnd: Date?
         for event in events {
             let previousPromptState = reminderPromptState
             let nextPromptState = previousPromptState.applying(event)
@@ -639,9 +953,21 @@ final class AppModel: ObservableObject {
 
             case let .restInterrupted(attempt):
                 record(attempt)
+                latestRestAttemptEnd = max(
+                    latestRestAttemptEnd ?? attempt.endedAt,
+                    attempt.endedAt
+                )
+                if attempt.trigger != .manual,
+                   reminderPromptState == .initialDecision {
+                    deliverNativeReminderIfNeeded()
+                }
 
             case let .restCompleted(attempt):
                 record(attempt)
+                latestRestAttemptEnd = max(
+                    latestRestAttemptEnd ?? attempt.endedAt,
+                    attempt.endedAt
+                )
                 fatigueReminderMilestones.reset()
                 clearQueuedNativeReminder()
                 notificationService.clearReminder()
@@ -663,30 +989,26 @@ final class AppModel: ObservableObject {
                 }
             }
         }
+        if let latestRestAttemptEnd {
+            flushAnalyticsSample(
+                at: latestRestAttemptEnd,
+                presenceState: presenceEngine.state,
+                elapsed: lastPersistenceAt.map {
+                    max(0, latestRestAttemptEnd.timeIntervalSince($0))
+                } ?? 0
+            )
+            persistRestAttemptOutbox(at: latestRestAttemptEnd)
+        }
     }
 
     private func record(_ attempt: RestAttempt) {
-        let outcome: String
-        let reason: String?
-        switch attempt.outcome {
-        case .completed:
-            outcome = "completed"
-            reason = nil
-        case let .interrupted(interruption):
-            outcome = "interrupted"
-            reason = interruption.rawValue
-        }
-        eventStore.recordRestAttempt(
-            overloadEpisodeID: activeOverloadEpisodeID,
-            startedAt: attempt.startedAt,
-            endedAt: attempt.endedAt,
-            startFatigue: attempt.startFatiguePercent,
-            endFatigue: attempt.endFatiguePercent,
-            source: attempt.trigger.rawValue,
-            outcome: outcome,
-            interruptionReason: reason
+        RestAttemptOutboxPolicy.enqueue(
+            PendingRestAttempt(
+                attempt: attempt,
+                overloadEpisodeID: activeOverloadEpisodeID
+            ),
+            into: &pendingRestAttempts
         )
-        refreshAnalytics()
     }
 
     private func publish(at now: Date, presenceState: PresenceState? = nil) {
@@ -694,13 +1016,24 @@ final class AppModel: ObservableObject {
         if isResting, !snapshot.isResting {
             shouldDelayThemeRotationForSurfaceRetirement = true
         }
-        fatigue = snapshot.fatiguePercent
-        restRequired = snapshot.restRequired
-        isResting = snapshot.isResting
-        restProgress = fatigueEngine.restProgress
-        overloadDuration = snapshot.overloadStartedAt.map {
+        if AppModelPublicationPolicy.shouldPublishFatigue(
+            current: fatigue,
+            updated: snapshot.fatiguePercent
+        ) {
+            fatigue = snapshot.fatiguePercent
+        }
+        updatePublished(\.restRequired, to: snapshot.restRequired)
+        updatePublished(\.isResting, to: snapshot.isResting)
+        updatePublished(\.restProgress, to: fatigueEngine.restProgress)
+        let updatedOverloadDuration = snapshot.overloadStartedAt.map {
             max(0, now.timeIntervalSince($0))
         } ?? 0
+        if AppModelPublicationPolicy.shouldPublishDuration(
+            current: overloadDuration,
+            updated: updatedOverloadDuration
+        ) {
+            overloadDuration = updatedOverloadDuration
+        }
         if let presenceState {
             lastPresenceState = presenceState
         }
@@ -773,13 +1106,68 @@ final class AppModel: ObservableObject {
             reminderThemeRotationScheduler.pendingTheme
     }
 
+    private func startAnalyticsMaintenancePump() {
+        analyticsMaintenanceTask?.cancel()
+        analyticsMaintenanceTask = Task(priority: .utility) { @MainActor [weak self] in
+            guard let self else { return }
+            while self.isStarted, !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .milliseconds(50))
+                } catch {
+                    break
+                }
+                guard self.eventStore.cleanExpiredData() else { break }
+                await Task.yield()
+            }
+            self.analyticsMaintenanceTask = nil
+        }
+    }
+
     private func persist(at now: Date, force: Bool = false) {
-        if !force, let lastPersistenceAt, now.timeIntervalSince(lastPersistenceAt) < 5 {
+        if !force,
+           let lastPersistenceAt,
+           now >= lastPersistenceAt,
+           now.timeIntervalSince(lastPersistenceAt) < 5 {
             return
         }
         let elapsed = lastPersistenceAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
         lastPersistenceAt = now
+        let runtimeSaved = saveRuntimeState(at: now)
+        let persistedPendingAttempts = runtimeSaved && drainPendingRestAttempts()
+        if persistedPendingAttempts {
+            saveRuntimeState(at: now)
+        }
+        checkpointAnalyticsSample(
+            at: now,
+            presenceState: presenceEngine.state.rawValue,
+            elapsed: elapsed,
+            force: force
+        )
+        if persistedPendingAttempts {
+            refreshAnalytics()
+        }
+    }
+
+    @discardableResult
+    private func checkpointAnalyticsSample(
+        at now: Date,
+        presenceState: String,
+        elapsed: TimeInterval,
+        force: Bool
+    ) -> Bool {
         let snapshot = fatigueEngine.snapshot
+        eventStore.stageSample(
+            at: now,
+            fatigue: snapshot.fatiguePercent,
+            presenceState: presenceState,
+            elapsed: elapsed,
+            continuousUsageDuration: continuousUsageDuration
+        )
+        guard AnalyticsSamplingPolicy.shouldFlush(
+            lastFlushAt: lastAnalyticsSampleFlushAt,
+            now: now,
+            force: force
+        ) else { return true }
         if let id = activeOverloadEpisodeID {
             eventStore.updateOverload(
                 id: id,
@@ -787,29 +1175,92 @@ final class AppModel: ObservableObject {
                 save: false
             )
         }
-        eventStore.saveRuntimeState(PersistedRuntimeState(
+        let flushSucceeded = eventStore.flushStagedSamples()
+        if flushSucceeded {
+            lastAnalyticsSampleFlushAt = now
+        }
+        return flushSucceeded
+    }
+
+    @discardableResult
+    private func flushAnalyticsSample(
+        at now: Date,
+        presenceState: PresenceState,
+        elapsed: TimeInterval
+    ) -> Bool {
+        checkpointAnalyticsSample(
+            at: now,
+            presenceState: presenceState.rawValue,
+            elapsed: elapsed,
+            force: true
+        )
+    }
+
+    @discardableResult
+    private func saveRuntimeState(at now: Date) -> Bool {
+        let snapshot = fatigueEngine.snapshot
+        return eventStore.saveRuntimeState(PersistedRuntimeState(
             fatigue: snapshot.fatiguePercent,
             restRequired: snapshot.restRequired,
             overloadStartedAt: snapshot.overloadStartedAt,
             overloadEpisodeID: activeOverloadEpisodeID,
             continuousUsageDuration: continuousUsageDuration,
+            activeRest: snapshot.activeRest,
+            pendingRestAttempts: pendingRestAttempts,
             reminderPromptState: reminderPromptState,
             reminderDecisionPending: reminderPromptState != .hidden,
             lastInactivityRestCompletedAt: lastInactivityRestCompletedAt,
             lastReminderMultiple: fatigueReminderMilestones.lastReminderMultiple,
             savedAt: now
         ))
-        eventStore.recordSample(
-            at: now,
-            fatigue: snapshot.fatiguePercent,
-            presenceState: presenceEngine.state.rawValue,
-            elapsed: elapsed,
-            continuousUsageDuration: continuousUsageDuration
+    }
+
+    private func persistRestAttemptOutbox(at now: Date) {
+        guard saveRuntimeState(at: now) else { return }
+        guard drainPendingRestAttempts() else { return }
+        saveRuntimeState(at: now)
+        refreshAnalytics()
+    }
+
+    private func drainPendingRestAttempts() -> Bool {
+        RestAttemptOutboxPolicy.drain(&pendingRestAttempts) { [eventStore] pendingAttempt in
+            Self.persist(pendingAttempt, to: eventStore)
+        }
+    }
+
+    private static func persist(
+        _ pendingAttempt: PendingRestAttempt,
+        to store: EventStore
+    ) -> Bool {
+        let attempt = pendingAttempt.attempt
+        let outcome: String
+        let reason: String?
+        switch attempt.outcome {
+        case .completed:
+            outcome = "completed"
+            reason = nil
+        case let .interrupted(interruption):
+            outcome = "interrupted"
+            reason = interruption.rawValue
+        }
+        return store.recordRestAttempt(
+            id: attempt.id,
+            overloadEpisodeID: pendingAttempt.overloadEpisodeID,
+            startedAt: attempt.startedAt,
+            endedAt: attempt.endedAt,
+            startFatigue: attempt.startFatiguePercent,
+            endFatigue: attempt.endFatiguePercent,
+            source: attempt.trigger.rawValue,
+            outcome: outcome,
+            interruptionReason: reason
         )
     }
 
     private func updatePermissions(_ state: PermissionState) {
-        inputPermissionGranted = state.inputMonitoring == .authorized
+        updatePublished(
+            \.inputPermissionGranted,
+            to: state.inputMonitoring == .authorized
+        )
 
         if inputPermissionGranted {
             startInputMonitoringIfNeeded()
@@ -839,7 +1290,7 @@ final class AppModel: ObservableObject {
         let status = MonitoringRuntimeStatus(
             inputMonitorRunning: inputMonitor.isRunning
         )
-        isMonitoringComplete = status.isComplete
+        updatePublished(\.isMonitoringComplete, to: status.isComplete)
     }
 
     private func handleReminderModeChange() {
@@ -987,19 +1438,29 @@ final class AppModel: ObservableObject {
     }
 
     private func refreshPresenceDescription() {
+        let updatedDescription: String
         if isResting {
-            presenceDescription = AppLocalization.string(
+            updatedDescription = AppLocalization.string(
                 L10nKey.presenceResting,
                 language: resolvedLanguage
             )
         } else if let lastPresenceState {
-            presenceDescription = description(for: lastPresenceState)
+            updatedDescription = description(for: lastPresenceState)
         } else {
-            presenceDescription = AppLocalization.string(
+            updatedDescription = AppLocalization.string(
                 L10nKey.presenceWaitingForFirstInput,
                 language: resolvedLanguage
             )
         }
+        updatePublished(\.presenceDescription, to: updatedDescription)
+    }
+
+    private func updatePublished<Value: Equatable>(
+        _ keyPath: ReferenceWritableKeyPath<AppModel, Value>,
+        to updatedValue: Value
+    ) {
+        guard self[keyPath: keyPath] != updatedValue else { return }
+        self[keyPath: keyPath] = updatedValue
     }
 
     private func openPrivacySettings(anchor: String) {

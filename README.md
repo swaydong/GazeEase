@@ -29,7 +29,7 @@ The installer never grants or resets privacy permissions, changes the launch-at-
 ## Features and behavior
 
 - The menu bar shows the current fatigue percentage. Fatigue can exceed 100%; values over 999% use a compact display while the exact value is retained.
-- Reminder visuals can use Lake Horizon, Forest Skylight, Snow Ridge Mist, or Twilight Dunes. The selected theme is shared by full-screen reminders, the unified rest countdown, the top prompt, and the expanded menu panel.
+- Reminder visuals can use Quiet Horizon, Forest Light, Alpine Mist, Twilight Dunes, Moss Garden Rain, Polar Night Glow, Moonlit Bamboo, Rainwashed Sea Cliff, or Cloudfield Wind. The selected theme is shared by full-screen reminders, the unified rest countdown, the top prompt, and the expanded menu panel.
 - Settings and the expanded menu panel continue the selected scene, palette, and atmosphere instead of merely recoloring buttons.
 - Optional random theme rotation defaults to every 60 minutes, accepts 5–1440 minutes, and never repeats the same theme consecutively. A due rotation waits for a safe moment while a reminder or rest surface is visible.
 - Ordinary stillness, reading, or thinking is not considered rest by default.
