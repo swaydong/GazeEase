@@ -6,7 +6,7 @@ IFS=$'\n\t'
 readonly EXPECTED_BUNDLE_ID="com.local.EyeProtection"
 readonly EXPECTED_TEAM_ID="3Q9DKW2UKF"
 readonly EXPECTED_EXECUTABLE="Eye Protection"
-readonly EXPECTED_BUILD="37"
+readonly EXPECTED_BUILD="39"
 readonly EXPECTED_VERSION="1.1.0"
 readonly PROJECT_NAME="EyeProtection.xcodeproj"
 readonly SCHEME_NAME="EyeProtection"
@@ -110,7 +110,9 @@ for required_file in \
     "$PROJECT_ROOT/INSTALL.md" \
     "$PROJECT_ROOT/INSTALL.zh-CN.md" \
     "$PROJECT_ROOT/PRIVACY.md" \
-    "$PROJECT_ROOT/PRIVACY.zh-CN.md"; do
+    "$PROJECT_ROOT/PRIVACY.zh-CN.md" \
+    "$PROJECT_ROOT/LICENSE" \
+    "$PROJECT_ROOT/ASSETS.md"; do
     [[ -e "$required_file" ]] || fail "Required packaging input is missing: $required_file"
 done
 
@@ -151,6 +153,8 @@ OUTPUT_CHECKSUM="$DIST_DIR/$CHECKSUM_NAME"
 [[ ! -e "$OUTPUT_CHECKSUM" ]] || fail "Output already exists: $OUTPUT_CHECKSUM"
 
 /usr/bin/ditto "$BUILT_APP" "$PACKAGE_DIR/GazeEase.app"
+/usr/bin/ditto "$PROJECT_ROOT/LICENSE" "$PACKAGE_DIR/LICENSE"
+/usr/bin/ditto "$PROJECT_ROOT/ASSETS.md" "$PACKAGE_DIR/ASSETS.md"
 /usr/bin/ditto "$PROJECT_ROOT/Packaging/Install GazeEase.command" "$PACKAGE_DIR/Install GazeEase.command"
 /usr/bin/ditto "$PROJECT_ROOT/Packaging/Uninstall GazeEase.command" "$PACKAGE_DIR/Uninstall GazeEase.command"
 /usr/bin/ditto "$PROJECT_ROOT/README.md" "$PACKAGE_DIR/README.md"

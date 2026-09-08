@@ -6,7 +6,7 @@ IFS=$'\n\t'
 readonly EXPECTED_BUNDLE_ID="com.local.EyeProtection"
 readonly EXPECTED_TEAM_ID="3Q9DKW2UKF"
 readonly EXPECTED_EXECUTABLE="Eye Protection"
-readonly EXPECTED_BUILD="37"
+readonly EXPECTED_BUILD="39"
 readonly EXPECTED_VERSION="1.1.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -116,7 +116,9 @@ for required_file in \
     "$PROJECT_ROOT/Packaging/TRUSTED_TEST_INSTALL.zh-CN.txt" \
     "$PROJECT_ROOT/Packaging/TRUSTED_TEST_INSTALL.en.txt" \
     "$PROJECT_ROOT/PRIVACY.md" \
-    "$PROJECT_ROOT/PRIVACY.zh-CN.md"; do
+    "$PROJECT_ROOT/PRIVACY.zh-CN.md" \
+    "$PROJECT_ROOT/LICENSE" \
+    "$PROJECT_ROOT/ASSETS.md"; do
     [[ -f "$required_file" ]] || fail "Required packaging input is missing: $required_file"
 done
 
@@ -160,6 +162,8 @@ if /usr/bin/xattr -p com.apple.quarantine "$SOURCE_APP" >/dev/null 2>&1; then
 fi
 
 /usr/bin/ditto "$SOURCE_APP" "$PACKAGE_DIR/GazeEase.app"
+/usr/bin/ditto "$PROJECT_ROOT/LICENSE" "$PACKAGE_DIR/LICENSE"
+/usr/bin/ditto "$PROJECT_ROOT/ASSETS.md" "$PACKAGE_DIR/ASSETS.md"
 /usr/bin/codesign \
     --force \
     --sign "$SOURCE_AUTHORITY" \

@@ -239,6 +239,11 @@ public struct FatigueSnapshot: Codable, Sendable, Equatable {
         activeRest != nil
     }
 
+    /// Partial recovery pauses reminders without completing the recorded rest episode.
+    public var needsRestReminder: Bool {
+        restRequired && fatiguePercent >= 100
+    }
+
 }
 
 public enum FatigueEvent: Codable, Sendable, Equatable {

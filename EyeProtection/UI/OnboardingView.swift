@@ -100,7 +100,7 @@ struct OnboardingView: View {
                 .frame(width: 30, height: 30)
                 .accessibilityHidden(true)
 
-            Text("GazeEase")
+            Text(AppLocalization.string(.appName, language: language))
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
 

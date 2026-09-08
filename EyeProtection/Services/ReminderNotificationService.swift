@@ -5,12 +5,37 @@ enum ReminderNotificationDeliveryResult: Equatable {
     case delivered
     case notAuthorized
     case failed
+    case cancelled
+}
+
+@MainActor
+final class ReminderNotificationDeliveryGate {
+    private var currentID: UUID?
+    private var isStillRelevant: (() -> Bool)?
+
+    func begin(isStillRelevant: @escaping () -> Bool) -> UUID {
+        let id = UUID()
+        currentID = id
+        self.isStillRelevant = isStillRelevant
+        return id
+    }
+
+    func allows(_ id: UUID?) -> Bool {
+        guard let id, id == currentID else { return false }
+        return isStillRelevant?() == true
+    }
+
+    func invalidate() {
+        currentID = nil
+        isStillRelevant = nil
+    }
 }
 
 enum ReminderNotificationContent {
     static let requestIdentifierPrefix = "rest-required"
     static let episodeIDKey = "overloadEpisodeID"
     static let reminderMultipleKey = "reminderMultiple"
+    static let deliveryIDKey = "deliveryID"
 
     static func requestIdentifier(episodeID: UUID, reminderMultiple: Int) -> String {
         "\(requestIdentifierPrefix).\(episodeID.uuidString).\(max(1, reminderMultiple))"
@@ -58,6 +83,7 @@ final class ReminderNotificationService: NSObject, UNUserNotificationCenterDeleg
     private let center = UNUserNotificationCenter.current()
     private var isConfigured = false
     private var pendingOpenEpisodeID: UUID?
+    private let deliveryGate = ReminderNotificationDeliveryGate()
 
     func configure() {
         guard !isConfigured else { return }
@@ -83,19 +109,25 @@ final class ReminderNotificationService: NSObject, UNUserNotificationCenterDeleg
         fatigueDisplay: String,
         episodeID: UUID,
         reminderMultiple: Int = 1,
-        language: AppLanguage = .zhHans
+        language: AppLanguage = .zhHans,
+        isStillRelevant: @escaping () -> Bool = { true }
     ) async -> ReminderNotificationDeliveryResult {
-        guard await ensureAuthorization() else {
+        guard isStillRelevant() else { return .cancelled }
+        let authorized = await ensureAuthorization()
+        guard isStillRelevant() else { return .cancelled }
+        guard authorized else {
             return .notAuthorized
         }
 
         clearReminder()
+        let deliveryID = deliveryGate.begin(isStillRelevant: isStillRelevant)
         let content = ReminderNotificationContent.make(
             fatigueDisplay: fatigueDisplay,
             episodeID: episodeID,
             reminderMultiple: reminderMultiple,
             language: language
         )
+        content.userInfo[ReminderNotificationContent.deliveryIDKey] = deliveryID.uuidString
         let request = UNNotificationRequest(
             identifier: ReminderNotificationContent.requestIdentifier(
                 episodeID: episodeID,
@@ -107,6 +139,7 @@ final class ReminderNotificationService: NSObject, UNUserNotificationCenterDeleg
 
         do {
             try await center.add(request)
+            guard deliveryGate.allows(deliveryID) else { return .cancelled }
             return .delivered
         } catch {
             return .failed
@@ -114,16 +147,22 @@ final class ReminderNotificationService: NSObject, UNUserNotificationCenterDeleg
     }
 
     func clearReminder() {
+        deliveryGate.invalidate()
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
     }
 
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .list])
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        let deliveryID = (notification.request.content.userInfo[
+            ReminderNotificationContent.deliveryIDKey
+        ] as? String).flatMap(UUID.init(uuidString:))
+        let allowed = await MainActor.run { [weak self] in
+            self?.deliveryGate.allows(deliveryID) == true
+        }
+        return allowed ? [.banner, .list] : []
     }
 
     nonisolated func userNotificationCenter(

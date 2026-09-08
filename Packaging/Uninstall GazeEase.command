@@ -23,7 +23,7 @@ read_info_value() {
 verify_installed_app() {
     local actual_bundle_id actual_team actual_executable actual_build signing_output architectures required_architecture
 
-    [[ -d "$INSTALLED_APP" ]] || fail "未在固定路径找到 GazeEase：$INSTALLED_APP"
+    [[ -d "$INSTALLED_APP" ]] || fail "未在固定路径找到护眼之道：$INSTALLED_APP"
     [[ ! -L "$INSTALLED_APP" ]] || fail "拒绝移动符号链接：$INSTALLED_APP"
     /usr/bin/codesign --verify --deep --strict --verbose=2 "$INSTALLED_APP" >/dev/null
 
@@ -89,7 +89,7 @@ quit_installed_app() {
         /bin/sleep 0.2
     done
 
-    fail "GazeEase 未能正常退出。请手动退出后重试；卸载器不会强制结束进程。"
+    fail "护眼之道未能正常退出。请手动退出后重试；卸载器不会强制结束进程。"
 }
 
 for required_command in awk codesign lipo pgrep plutil ps; do
@@ -100,7 +100,7 @@ verify_installed_app
 APP_BUILD="$(read_info_value "$INSTALLED_APP" CFBundleVersion)"
 
 printf '%s\n' \
-    '卸载前，请先在 GazeEase 设置中关闭“登录时启动”。' \
+    '卸载前，请先在护眼之道设置中关闭“登录时启动”。' \
     'Before uninstalling, turn off “Launch at Login” in GazeEase Settings.' \
     '' \
     '本脚本只会把 App 移到废纸篓。偏好、疲劳历史和系统权限都会保留。' \
@@ -133,7 +133,7 @@ if [[ -x "$LSREGISTER" ]]; then
     "$LSREGISTER" -u "$TRASH_APP" >/dev/null 2>&1 || true
 fi
 
-printf '\n已将 GazeEase 移到废纸篓：\n  %s\n' "$TRASH_APP"
+printf '\n已将护眼之道移到废纸篓：\n  %s\n' "$TRASH_APP"
 printf '%s\n' \
     '没有删除偏好、分析记录或权限，也没有调用系统隐私或登录项重置工具。' \
     '如果忘记关闭登录启动，请在“系统设置 → 通用 → 登录项”中手动关闭残留项。' \

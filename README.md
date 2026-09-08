@@ -2,15 +2,16 @@
 
 English · [简体中文](README.zh-CN.md)
 
-GazeEase is a privacy-first macOS menu bar timer that estimates visual fatigue from active computer use. By default, 20 minutes of effective use reaches 100% fatigue and a complete rest takes 20 uninterrupted seconds. Both durations are configurable. Once rest is required, that requirement remains latched until a complete rest finishes.
+GazeEase is a privacy-first macOS menu bar timer that estimates visual fatigue from active computer use. By default, 20 minutes of effective use reaches 100% fatigue and a complete rest takes 20 uninterrupted seconds. Both durations are configurable. Partial recovery below 100% pauses reminders until fatigue reaches 100% again; a complete rest resets fatigue to zero.
 
 ## Distribution status
 
-This repository currently produces a **private, local Apple Development build** for the developer's own Mac. It is not Developer ID signed or notarized, and it is not intended for public redistribution. Do not remove quarantine attributes, ad-hoc re-sign the app, or treat this package as a public release.
+The source is public under the [MIT License](LICENSE). Theme artwork and brand assets have a separate, limited license in [ASSETS.md](ASSETS.md); they are **not** covered by MIT.
 
-Public distribution requires a stable final bundle identity, a Developer ID Application certificate, a Release build without `get-task-allow`, Apple notarization, stapling, and Gatekeeper verification.
+Version `1.1.0`, Build `39` is a **source-only public release**, not a ready-to-install public download. Build it with your own development identity using the instructions below. Existing Apple Development local and trusted-test packages are not Developer ID signed or notarized; they are not general-purpose public installers.
 
-## Install without Xcode
+<details>
+<summary>Existing local packages — maintainer's development Mac only</summary>
 
 If you received a local GazeEase ZIP package:
 
@@ -26,6 +27,8 @@ If you received a local GazeEase ZIP package:
 
 The installer never grants or resets privacy permissions, changes the launch-at-login setting, or deletes preferences and history. See [Installation and upgrades](INSTALL.md) for complete instructions.
 
+</details>
+
 ## Features and behavior
 
 - The menu bar shows the current fatigue percentage. Fatigue can exceed 100%; values over 999% use a compact display while the exact value is retained.
@@ -35,8 +38,8 @@ The installer never grants or resets privacy permissions, changes the launch-at-
 - Ordinary stillness, reading, or thinking is not considered rest by default.
 - The first reminder can be a quiet macOS notification, a two-button top prompt, or a two-button full-screen reminder.
 - The top and full-screen prompts show **Not Now** and **Start Rest** directly. Ignoring a system notification continues work; clicking it starts rest.
-- Choosing **Not Now** closes the current prompt while fatigue, the latched rest requirement, and overload duration continue accumulating. A new reminder appears at every newly reached 100% multiple.
-- If keyboard, click, scroll, or significant pointer movement interrupts a manual rest, the top two-button prompt returns so rest can be restarted.
+- Choosing **Not Now** closes the current prompt while fatigue continues accumulating. A new reminder appears at every newly reached 100% multiple; recovery below 100% re-arms these milestones.
+- If input interrupts a rest, the recovered fatigue is preserved. The top two-button prompt returns only if fatigue is still at least 100%; below 100%, reminders stay hidden until the threshold is reached again. An interrupted rest remains an interrupted record.
 - Starting rest covers every display. Input interrupts the rest attempt.
 - The use interval accepts 1–180 minutes; the complete rest duration accepts 5–300 seconds.
 - Changing the use interval recalculates fatigue from accumulated effective use. Changing rest duration only affects the rest countdown.
@@ -56,16 +59,18 @@ Requirements: macOS 14 or later and Xcode 16 or later.
 
 1. Open `EyeProtection.xcodeproj`.
 2. Select the `EyeProtection` scheme and `My Mac`.
-3. Run the app and enable Input Monitoring when prompted.
-4. If the permission does not apply immediately, quit and reopen the app.
+3. In **Signing & Capabilities**, select your own Team and a unique Bundle Identifier for your development copy. Update the test target's signing identity if Xcode requests it. Do not reuse the maintainer's Team or app identity.
+4. Run the app and enable Input Monitoring for your copy when prompted. Its permission record is separate from an existing installation.
+5. If the permission does not apply immediately, quit and reopen the app.
 
-To regenerate the project from `project.yml`, install XcodeGen and run:
+The project is checked in. To regenerate it from `project.yml`, install XcodeGen and run the command below, then reapply your local Team and Bundle Identifier (or set them in your local `project.yml` first). Do not submit personal signing changes.
 
 ```sh
 xcodegen generate
 ```
 
-## Create the private local package
+<details>
+<summary>Maintainer-only local packaging</summary>
 
 The packaging script uses a fresh DerivedData directory, builds a signed Release, validates the exact bundle ID, team, build number, architectures, and Apple Development signature, then creates a ZIP and SHA-256 file in `Dist/`.
 
@@ -75,20 +80,26 @@ The packaging script uses a fresh DerivedData directory, builds a signed Release
 
 The script intentionally refuses Developer ID or ad-hoc signatures because it is only for the current private local workflow. It does not install or launch the resulting package.
 
+</details>
+
 ## Verification
 
+Tests, static analysis, and compile checks do not require the maintainer's signing credentials:
+
 ```sh
-xcodebuild -project EyeProtection.xcodeproj -scheme EyeProtection -destination 'platform=macOS' -derivedDataPath /tmp/EyeProtectionDerivedData test
-xcodebuild -project EyeProtection.xcodeproj -scheme EyeProtection -configuration Release -destination 'platform=macOS' -derivedDataPath /tmp/EyeProtectionReleaseDerivedData build
+xcodebuild -project EyeProtection.xcodeproj -scheme EyeProtection -destination 'platform=macOS' -derivedDataPath /tmp/EyeProtectionDerivedData CODE_SIGNING_ALLOWED=NO test
+xcodebuild -project EyeProtection.xcodeproj -scheme EyeProtection -configuration Release -destination 'platform=macOS' -derivedDataPath /tmp/EyeProtectionReleaseDerivedData CODE_SIGNING_ALLOWED=NO build
 xcodebuild -project EyeProtection.xcodeproj -scheme EyeProtection -configuration Debug -destination 'platform=macOS' -derivedDataPath /tmp/EyeProtectionAnalyzeDerivedData CODE_SIGNING_ALLOWED=NO analyze
 ```
 
-The local Release must retain the Apple Development signature produced by Xcode and must be copied as a complete bundle. Never overwrite it with an ad-hoc signature. Keeping the bundle ID, development team, signing identity, and installation path stable gives macOS the best chance of recognizing updates as the same app.
+An unsigned compile check is not an installable release. For runtime and permission testing, use your own signed development copy; keep its identity and location stable across your own upgrades.
 
-Before any public release, complete Developer ID signing and notarization, then verify multi-display behavior, full-screen spaces, permission revocation, lock/sleep recovery, launch at login, and a two-hour Energy Log on the target Mac.
+A future ready-to-install public binary is a separate workflow: Developer ID signing, notarization, stapling, and Gatekeeper verification, followed by target-Mac checks of multi-display behavior, full-screen spaces, permission revocation, lock/sleep recovery, launch at login, and energy usage. Publishing source does not claim these binary-distribution checks are complete.
 
 ## Documentation
 
+- [Code license (MIT)](LICENSE) · [Visual asset terms](ASSETS.md)
+- [Contributing](CONTRIBUTING.md) · [贡献指南](CONTRIBUTING.zh-CN.md)
 - [Installation, upgrade, and uninstall](INSTALL.md)
 - [安装、升级与卸载](INSTALL.zh-CN.md)
 - [Privacy statement](PRIVACY.md)

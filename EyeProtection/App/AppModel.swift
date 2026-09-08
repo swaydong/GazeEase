@@ -83,17 +83,19 @@ enum AppModelPublicationPolicy {
 
 enum RestRuntimePolicy {
     static func restoredPromptState(from runtime: PersistedRuntimeState?) -> ReminderPromptState {
-        guard runtime?.restRequired == true else { return .hidden }
-        if runtime?.activeRest != nil {
+        guard let runtime, runtime.restRequired, runtime.fatigue >= 100 else {
+            return .hidden
+        }
+        if runtime.activeRest != nil {
             return .manualRetry
         }
-        if runtime?.reminderPromptState == nil,
-           runtime?.reminderDecisionPending == nil {
+        if runtime.reminderPromptState == nil,
+           runtime.reminderDecisionPending == nil {
             return .initialDecision
         }
         let restored = ReminderPromptState.restored(
-            savedState: runtime?.reminderPromptState,
-            legacyDecisionPending: runtime?.reminderDecisionPending
+            savedState: runtime.reminderPromptState,
+            legacyDecisionPending: runtime.reminderDecisionPending
         )
         return restored
     }
@@ -182,6 +184,7 @@ final class AppModel: ObservableObject {
     static let shared = AppModel()
 
     @Published private(set) var fatigue: Double
+    /// Current reminder eligibility; the engine retains the unfinished episode for analytics.
     @Published private(set) var restRequired: Bool
     @Published private(set) var isResting: Bool
     @Published private(set) var restProgress: Double
@@ -273,6 +276,7 @@ final class AppModel: ObservableObject {
     private var nextInputMonitorRetryAt = Date.distantPast
     private var inputMonitorRetryDelay: TimeInterval = 2
     private var nativeReminderDeliveryInFlight = false
+    private var nativeReminderGeneration = UUID()
     private var nativeReminderDeliveryMultiple: Int?
     private var pendingNativeReminderMultiple: Int?
     private var shouldDelayThemeRotationForSurfaceRetirement = false
@@ -314,10 +318,12 @@ final class AppModel: ObservableObject {
             )
             if var normalizedRuntime = runtime {
                 normalizedRuntime.activeRest = nil
-                normalizedRuntime.reminderPromptState = normalizedRuntime.restRequired
+                normalizedRuntime.reminderPromptState = normalizedRuntime.restRequired &&
+                    normalizedRuntime.fatigue >= 100
                     ? .manualRetry
                     : .hidden
-                normalizedRuntime.reminderDecisionPending = normalizedRuntime.restRequired
+                normalizedRuntime.reminderDecisionPending =
+                    normalizedRuntime.reminderPromptState != .hidden
                 normalizedRuntime.pendingRestAttempts = pendingRestAttempts
                 normalizedRuntime.savedAt = Date()
                 pendingAttemptsAreDurable = store.saveRuntimeState(normalizedRuntime)
@@ -389,7 +395,7 @@ final class AppModel: ObservableObject {
             pendingTheme: Preferences.randomThemeRotationPendingTheme
         )
         self.fatigue = restoredSnapshot.fatiguePercent
-        self.restRequired = restoredSnapshot.restRequired
+        self.restRequired = restoredSnapshot.needsRestReminder
         self.isResting = false
         self.restProgress = 0
         self.overloadDuration = restoredSnapshot.overloadStartedAt.map {
@@ -596,7 +602,7 @@ final class AppModel: ObservableObject {
     var canShowTestReminderPreview: Bool {
         isMonitoringComplete &&
             !fatigueEngine.isResting &&
-            !fatigueEngine.snapshot.restRequired
+            !fatigueEngine.snapshot.needsRestReminder
     }
 
     func setRestSeconds(_ seconds: Int) {
@@ -773,7 +779,7 @@ final class AppModel: ObservableObject {
                     at: state.timestamp
                 )
                 reminderPromptState = RestRuntimePolicy.promptStateAfterInterruptedSystemRest(
-                    restRequired: fatigueEngine.snapshot.restRequired
+                    restRequired: fatigueEngine.snapshot.needsRestReminder
                 )
                 process(events)
                 publish(at: state.timestamp)
@@ -916,11 +922,19 @@ final class AppModel: ObservableObject {
 
             switch event {
             case let .fatigueChanged(from, to, _):
-                guard activeOverloadEpisodeID != nil,
-                      let multiple = fatigueReminderMilestones.consumeNewMilestone(
-                          from: from,
-                          to: to
-                      ) else { break }
+                guard activeOverloadEpisodeID != nil else { break }
+                let newMilestone = fatigueReminderMilestones.consumeNewMilestone(
+                    from: from,
+                    to: to
+                )
+                if to < 100 {
+                    if from >= 100 {
+                        clearQueuedNativeReminder()
+                        notificationService.clearReminder()
+                    }
+                    break
+                }
+                guard let multiple = newMilestone else { break }
 
                 if reminderPromptState == .hidden {
                     reminderPromptState = .initialDecision
@@ -942,6 +956,7 @@ final class AppModel: ObservableObject {
                 deliverNativeReminderIfNeeded()
 
             case let .restStarted(rest):
+                clearQueuedNativeReminder()
                 notificationService.clearReminder()
                 if let id = activeOverloadEpisodeID {
                     eventStore.markOverloadResponse(
@@ -983,6 +998,7 @@ final class AppModel: ObservableObject {
                 notificationService.clearReminder()
 
             case let .continuedWorking(at):
+                clearQueuedNativeReminder()
                 notificationService.clearReminder()
                 if let id = activeOverloadEpisodeID {
                     eventStore.markOverloadResponse(id: id, kind: "continued", at: at)
@@ -1022,7 +1038,7 @@ final class AppModel: ObservableObject {
         ) {
             fatigue = snapshot.fatiguePercent
         }
-        updatePublished(\.restRequired, to: snapshot.restRequired)
+        updatePublished(\.restRequired, to: snapshot.needsRestReminder)
         updatePublished(\.isResting, to: snapshot.isResting)
         updatePublished(\.restProgress, to: fatigueEngine.restProgress)
         let updatedOverloadDuration = snapshot.overloadStartedAt.map {
@@ -1294,6 +1310,7 @@ final class AppModel: ObservableObject {
     }
 
     private func handleReminderModeChange() {
+        clearQueuedNativeReminder()
         notificationService.clearReminder()
         guard reminderMode == .systemNotification else { return }
 
@@ -1315,9 +1332,11 @@ final class AppModel: ObservableObject {
 
     private func deliverNativeReminderIfNeeded() {
         let snapshot = fatigueEngine.snapshot
-        guard reminderMode == .systemNotification,
+        guard isStarted,
+              reminderMode == .systemNotification,
               reminderPromptState == .initialDecision,
-              snapshot.restRequired,
+              snapshot.needsRestReminder,
+              !snapshot.isResting,
               let episodeID = activeOverloadEpisodeID else { return }
 
         let deliveryMultiple = max(1, fatigueReminderMilestones.lastReminderMultiple)
@@ -1328,6 +1347,7 @@ final class AppModel: ObservableObject {
 
         nativeReminderDeliveryInFlight = true
         nativeReminderDeliveryMultiple = deliveryMultiple
+        let deliveryGeneration = nativeReminderGeneration
         let display = FatigueValueFormatter.display(snapshot.fatiguePercent)
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -1335,10 +1355,31 @@ final class AppModel: ObservableObject {
                 fatigueDisplay: display,
                 episodeID: episodeID,
                 reminderMultiple: deliveryMultiple,
-                language: resolvedLanguage
+                language: resolvedLanguage,
+                isStillRelevant: { [weak self] in
+                    guard let self else { return false }
+                    // A successful submission consumes the prompt before the banner
+                    // may appear. Recovery or dismissal invalidates the generation.
+                    return self.isStarted &&
+                        self.nativeReminderGeneration == deliveryGeneration &&
+                        self.reminderMode == .systemNotification &&
+                        self.fatigueEngine.snapshot.needsRestReminder &&
+                        !self.fatigueEngine.isResting &&
+                        self.activeOverloadEpisodeID == episodeID
+                }
             )
             nativeReminderDeliveryInFlight = false
             nativeReminderDeliveryMultiple = nil
+
+            if deliveryGeneration != nativeReminderGeneration {
+                // A partial recovery can re-arm 100% while an older notification
+                // is awaiting authorization. Retry from the current cycle, even
+                // when its milestone is lower than the stale request's milestone.
+                notificationService.clearReminder()
+                pendingNativeReminderMultiple = nil
+                deliverNativeReminderIfNeeded()
+                return
+            }
 
             if fatigueEngine.isResting {
                 clearQueuedNativeReminder()
@@ -1349,7 +1390,7 @@ final class AppModel: ObservableObject {
             guard isStarted,
                   reminderMode == .systemNotification,
                   reminderPromptState == .initialDecision,
-                  fatigueEngine.snapshot.restRequired,
+                  fatigueEngine.snapshot.needsRestReminder,
                   activeOverloadEpisodeID == episodeID else {
                 clearQueuedNativeReminder()
                 notificationService.clearReminder()
@@ -1376,6 +1417,8 @@ final class AppModel: ObservableObject {
                 clearQueuedNativeReminder()
                 notificationPermissionDenied = false
                 reminderMode = .topPanel
+            case .cancelled:
+                clearQueuedNativeReminder()
             }
             persist(at: Date(), force: true)
         }
@@ -1388,13 +1431,14 @@ final class AppModel: ObservableObject {
     }
 
     private func clearQueuedNativeReminder() {
+        nativeReminderGeneration = UUID()
         pendingNativeReminderMultiple = nil
         nativeReminderDeliveryMultiple = nil
     }
 
     private func handleNotificationOpen(episodeID: UUID) {
         guard episodeID == activeOverloadEpisodeID,
-              fatigueEngine.snapshot.restRequired,
+              fatigueEngine.snapshot.needsRestReminder,
               !fatigueEngine.isResting else { return }
         beginRest()
     }

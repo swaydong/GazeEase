@@ -294,11 +294,13 @@ enum ReminderPromptState: String, Codable, Equatable, Sendable {
         case let .restStarted(rest):
             rest.trigger == .manual ? .hidden : self
         case let .restInterrupted(attempt):
-            attempt.trigger == .manual ? .manualRetry : self
+            attempt.endFatiguePercent < 100
+                ? .hidden
+                : (attempt.trigger == .manual ? .manualRetry : self)
         case .restCompleted, .overloadCompleted, .continuedWorking:
             .hidden
-        case .fatigueChanged:
-            self
+        case let .fatigueChanged(_, to, _):
+            to < 100 ? .hidden : self
         }
     }
 }
@@ -311,7 +313,7 @@ struct FatigueReminderMilestones: Equatable, Sendable {
         restRequired: Bool = false,
         fatigue: Double = 0
     ) {
-        guard restRequired else {
+        guard restRequired, fatigue >= 100 else {
             lastReminderMultiple = 0
             return
         }
@@ -334,6 +336,10 @@ struct FatigueReminderMilestones: Equatable, Sendable {
 
     @discardableResult
     mutating func consumeNewMilestone(from previousFatigue: Double, to fatigue: Double) -> Int? {
+        if fatigue < 100 {
+            reset()
+            return nil
+        }
         guard fatigue > previousFatigue else { return nil }
         let multiple = Self.multiple(for: fatigue)
         guard multiple >= 1, multiple > lastReminderMultiple else { return nil }

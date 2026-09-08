@@ -24,13 +24,22 @@ You need:
 
 - macOS 14 or later;
 - Xcode 16 or later;
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen), only if regenerating the project.
 
-Generate the Xcode project before building:
+Open the checked-in `EyeProtection.xcodeproj`. Before running the app, select
+your own Team in Signing & Capabilities and give your development copy a unique
+Bundle Identifier. Update test-target signing if requested by Xcode. Do not
+share the maintainer's signing or permission identity, or commit personal signing
+changes.
+
+To regenerate the project:
 
 ```sh
 xcodegen generate --spec project.yml
 ```
+
+Reapply your local signing settings afterward, or configure them in your local
+`project.yml` first.
 
 The app needs Input Monitoring permission for full runtime verification. Unit
 tests and unsigned CI builds must not require that permission.
@@ -77,7 +86,7 @@ private process in [SECURITY.md](SECURITY.md), not through a public issue.
 
 ## Artwork and licensing
 
-The repository's code license does not cover the theme backgrounds, brand
+Source code is licensed under [MIT](LICENSE). It does not cover the theme backgrounds, brand
 artwork, derived previews, or screenshots described in [ASSETS.md](ASSETS.md).
 Do not reuse third-party artwork or submit generated artwork without documenting
 its provenance and permitted use.

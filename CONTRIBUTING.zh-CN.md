@@ -1,6 +1,6 @@
-# 为 GazeEase 贡献
+# 为护眼之道贡献
 
-感谢你帮助改进 GazeEase。它是一款注重隐私的 macOS 护眼计时器，因此改动应保持聚焦、本地优先，并便于审阅。
+感谢你帮助改进护眼之道（GazeEase）。它是一款注重隐私的 macOS 护眼计时器，因此改动应保持聚焦、本地优先，并便于审阅。
 
 英文说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -18,13 +18,17 @@
 
 - macOS 14 或更高版本；
 - Xcode 16 或更高版本；
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)。
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen)，仅重新生成工程时需要。
 
-构建前先生成 Xcode 工程：
+打开仓库中的 `EyeProtection.xcodeproj`。运行 App 前，在 Signing & Capabilities 中选择自己的 Team，并为开发副本设置独立的 Bundle Identifier；Xcode 如要求，也需更新测试 Target 的签名。不要共用维护者的签名或权限身份，也不要提交个人签名配置。
+
+如需重新生成 Xcode 工程：
 
 ```sh
 xcodegen generate --spec project.yml
 ```
+
+生成后重新应用本机签名设置，或先在本地 `project.yml` 中配置。
 
 完整运行时验证需要为 App 授予“输入监控”权限；单元测试和 CI 的无签名构建不应依赖该权限。
 
@@ -61,7 +65,7 @@ Pull Request 中应说明对权限、本地存储、保留周期及用户可见�
 
 ## 视觉资产与许可
 
-仓库的代码许可证不涵盖 [ASSETS.md](ASSETS.md) 中列出的主题背景、品牌视觉、衍生预览和截图。不要复用第三方视觉内容；提交生成式视觉内容时，必须记录来源和允许使用的范围。
+源代码采用 [MIT 许可证](LICENSE)，不涵盖 [ASSETS.md](ASSETS.md) 中列出的主题背景、品牌视觉、衍生预览和截图。不要复用第三方视觉内容；提交生成式视觉内容时，必须记录来源和允许使用的范围。
 
 ## Pull Request 检查清单
 

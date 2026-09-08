@@ -2,6 +2,30 @@ import XCTest
 @testable import EyeProtection
 
 final class ReminderNotificationContentTests: XCTestCase {
+    @MainActor
+    func testPendingNotificationIsSuppressedWhenFatigueDropsBeforePresentation() {
+        let gate = ReminderNotificationDeliveryGate()
+        var fatigue = 100.0
+        let deliveryID = gate.begin { fatigue >= 100 }
+        XCTAssertTrue(gate.allows(deliveryID))
+
+        fatigue = 87
+        XCTAssertFalse(gate.allows(deliveryID))
+    }
+
+    @MainActor
+    func testNewThresholdCycleDoesNotPresentAnOldPendingNotification() {
+        let gate = ReminderNotificationDeliveryGate()
+        let oldDeliveryID = gate.begin { true }
+        gate.invalidate()
+        XCTAssertFalse(gate.allows(oldDeliveryID))
+
+        let newDeliveryID = gate.begin { true }
+        XCTAssertFalse(gate.allows(oldDeliveryID))
+        XCTAssertTrue(gate.allows(newDeliveryID))
+        XCTAssertFalse(gate.allows(nil))
+    }
+
     func testWeakNotificationIsSilentAndCarriesItsEpisodeIdentity() {
         let episodeID = UUID()
         let content = ReminderNotificationContent.make(

@@ -140,7 +140,7 @@ final class ReminderPresentationPolicyTests: XCTestCase {
         }
     }
 
-    func testShortSystemRestRestoresUnresolvedTopPanelReminder() throws {
+    func testShortSystemRestBelowThresholdHidesReminder() {
         let rest = ActiveRestSession(
             trigger: .screenLocked,
             startedAt: Date(timeIntervalSince1970: 1_000),
@@ -167,19 +167,19 @@ final class ReminderPresentationPolicyTests: XCTestCase {
             outcome: .interrupted(.cancelled)
         )
         promptState = RestRuntimePolicy.promptStateAfterInterruptedSystemRest(
-            restRequired: true
+            restRequired: interruptedAttempt.endFatiguePercent >= 100
         )
         promptState = promptState.applying(.restInterrupted(interruptedAttempt))
 
         for mode in ReminderMode.allCases {
-            XCTAssertNotNil(ReminderPresentationPolicy.panel(
-                restRequired: true,
+            XCTAssertNil(ReminderPresentationPolicy.panel(
+                restRequired: false,
                 isResting: false,
                 promptState: promptState,
                 reminderMode: mode
             ))
             XCTAssertNil(ReminderPresentationPolicy.overlay(
-                restRequired: true,
+                restRequired: false,
                 isResting: false,
                 activeRestTrigger: nil,
                 promptState: promptState,
@@ -267,8 +267,23 @@ final class ReminderPromptStateTests: XCTestCase {
         var state = ReminderPromptState.initialDecision.applying(.restStarted(activeRest))
         XCTAssertEqual(state, .hidden)
 
-        state = state.applying(.restInterrupted(makeAttempt(trigger: .manual)))
+        state = state.applying(.restInterrupted(makeAttempt(trigger: .manual, endFatigue: 110)))
         XCTAssertEqual(state, .manualRetry)
+    }
+
+    func testInterruptionBelowThresholdHidesEveryPreviousPromptState() {
+        for state in [ReminderPromptState.hidden, .initialDecision, .manualRetry] {
+            for trigger in [RestTrigger.manual, .screenLocked] {
+                XCTAssertEqual(
+                    state.applying(.restInterrupted(makeAttempt(trigger: trigger))),
+                    .hidden
+                )
+            }
+            XCTAssertEqual(
+                state.applying(.fatigueChanged(from: 180, to: 90, at: now)),
+                .hidden
+            )
+        }
     }
 
     func testSystemRestStartAndInterruptionPreservePreviousVisibility() {
@@ -277,7 +292,9 @@ final class ReminderPromptStateTests: XCTestCase {
             startedAt: now,
             startFatiguePercent: 180
         )
-        let interrupted = FatigueEvent.restInterrupted(makeAttempt(trigger: .screenLocked))
+        let interrupted = FatigueEvent.restInterrupted(
+            makeAttempt(trigger: .screenLocked, endFatigue: 110)
+        )
 
         var hidden = ReminderPromptState.hidden.applying(.restStarted(activeRest))
         hidden = hidden.applying(interrupted)
@@ -328,7 +345,8 @@ final class ReminderPromptStateTests: XCTestCase {
 
     private func makeAttempt(
         trigger: RestTrigger,
-        completed: Bool = false
+        completed: Bool = false,
+        endFatigue: Double = 90
     ) -> RestAttempt {
         RestAttempt(
             id: UUID(),
@@ -337,7 +355,7 @@ final class ReminderPromptStateTests: XCTestCase {
             endedAt: now.addingTimeInterval(10),
             startFatiguePercent: 180,
             duration: 10,
-            endFatiguePercent: completed ? 0 : 90,
+            endFatiguePercent: completed ? 0 : endFatigue,
             outcome: completed ? .completed : .interrupted(.cancelled)
         )
     }
@@ -569,7 +587,20 @@ final class FatigueReminderMilestonesTests: XCTestCase {
         XCTAssertEqual(tracker.lastReminderMultiple, 4)
     }
 
-    func testFatigueDecreaseNeverMovesMilestoneBackwardOrRepeatsIt() {
+    func testFatigueDecreaseAboveThresholdDoesNotRepeatMilestones() {
+        var tracker = FatigueReminderMilestones(
+            restoredLastReminderMultiple: 2,
+            restRequired: true,
+            fatigue: 250
+        )
+
+        XCTAssertNil(tracker.consumeNewMilestone(from: 250, to: 110))
+        XCTAssertNil(tracker.consumeNewMilestone(from: 110, to: 200))
+        XCTAssertEqual(tracker.lastReminderMultiple, 2)
+        XCTAssertEqual(tracker.consumeNewMilestone(from: 200, to: 300), 3)
+    }
+
+    func testRecoveryBelowThresholdRearmsTheFirstAndLaterMilestones() {
         var tracker = FatigueReminderMilestones(
             restoredLastReminderMultiple: 2,
             restRequired: true,
@@ -577,9 +608,21 @@ final class FatigueReminderMilestonesTests: XCTestCase {
         )
 
         XCTAssertNil(tracker.consumeNewMilestone(from: 250, to: 90))
-        XCTAssertNil(tracker.consumeNewMilestone(from: 90, to: 200))
-        XCTAssertEqual(tracker.lastReminderMultiple, 2)
-        XCTAssertEqual(tracker.consumeNewMilestone(from: 200, to: 300), 3)
+        XCTAssertEqual(tracker.lastReminderMultiple, 0)
+        XCTAssertNil(tracker.consumeNewMilestone(from: 90, to: 99.9))
+        XCTAssertEqual(tracker.consumeNewMilestone(from: 99.9, to: 100), 1)
+        XCTAssertEqual(tracker.consumeNewMilestone(from: 100, to: 200), 2)
+    }
+
+    func testRestorationBelowThresholdDiscardsOldMilestone() {
+        var tracker = FatigueReminderMilestones(
+            restoredLastReminderMultiple: 4,
+            restRequired: true,
+            fatigue: 87
+        )
+
+        XCTAssertEqual(tracker.lastReminderMultiple, 0)
+        XCTAssertEqual(tracker.consumeNewMilestone(from: 87, to: 100), 1)
     }
 
     func testLegacyRestoreInfersHighestAlreadyPresentedMultiple() {
@@ -603,5 +646,277 @@ final class FatigueReminderMilestonesTests: XCTestCase {
 
         XCTAssertEqual(tracker.lastReminderMultiple, 0)
         XCTAssertEqual(tracker.registerInitialReminder(fatigue: 100), 1)
+    }
+}
+
+final class PartialRecoveryReminderFlowTests: XCTestCase {
+    func testPartialRecoveryWaitsForOneHundredAndKeepsTheRestEpisode() throws {
+        var flow = ReminderFlow()
+        flow.use(for: 180)
+        let episodeID = try XCTUnwrap(flow.episodeID)
+        flow.rest(for: 10)
+
+        XCTAssertEqual(flow.engine.snapshot.fatiguePercent, 90, accuracy: 0.000_001)
+        XCTAssertEqual(flow.overlay(mode: .fullScreen), .resting)
+        let events = flow.interrupt()
+        guard case let .restInterrupted(attempt) = try XCTUnwrap(events.first) else {
+            return XCTFail("Partial rest must retain its interrupted outcome")
+        }
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(attempt.outcome, .interrupted(.keyboard))
+        XCTAssertEqual(attempt.trigger, .manual)
+        XCTAssertEqual(attempt.duration, 10)
+        XCTAssertTrue(flow.engine.snapshot.restRequired)
+        XCTAssertFalse(flow.engine.snapshot.needsRestReminder)
+        XCTAssertEqual(flow.engine.snapshot.activeOverloadEpisode?.id, episodeID)
+        assertNoReminder(flow)
+
+        flow.use(for: 9.9)
+        XCTAssertEqual(flow.engine.snapshot.fatiguePercent, 99.9, accuracy: 0.000_001)
+        assertNoReminder(flow)
+        flow.use(for: 0.1)
+        XCTAssertTrue(flow.engine.snapshot.needsRestReminder)
+        XCTAssertNotNil(flow.panel(mode: .topPanel))
+        XCTAssertEqual(flow.overlay(mode: .fullScreen), .decision)
+        XCTAssertEqual(flow.reminderMultiples, [1, 1])
+        let continuedWorking = flow.engine.recordContinueWorking(at: flow.now)
+        flow.apply(continuedWorking)
+        flow.use(for: 100)
+        XCTAssertNotNil(flow.panel(mode: .topPanel))
+        XCTAssertEqual(flow.reminderMultiples, [1, 1, 2])
+        XCTAssertEqual(flow.episodeID, episodeID)
+    }
+
+    func testTenSecondRestAtOrAboveOneHundredStillOffersRetry() {
+        for startingFatigue in [200.0, 220.0] {
+            var flow = ReminderFlow()
+            flow.use(for: startingFatigue)
+            flow.rest(for: 10)
+            _ = flow.interrupt()
+
+            XCTAssertEqual(
+                flow.engine.snapshot.fatiguePercent,
+                startingFatigue / 2,
+                accuracy: 0.000_001
+            )
+            XCTAssertTrue(flow.engine.snapshot.needsRestReminder)
+            XCTAssertEqual(flow.prompt, .manualRetry)
+            XCTAssertEqual(flow.milestones.lastReminderMultiple, 2)
+            for mode in ReminderMode.allCases {
+                XCTAssertNotNil(flow.panel(mode: mode))
+                XCTAssertNil(flow.overlay(mode: mode))
+            }
+        }
+    }
+
+    func testFullRestStillClearsFatigueAndCompletesTheEpisode() {
+        var flow = ReminderFlow()
+        flow.use(for: 250)
+        flow.rest(for: 20)
+
+        XCTAssertEqual(flow.engine.snapshot.fatiguePercent, 0)
+        XCTAssertFalse(flow.engine.snapshot.restRequired)
+        XCTAssertFalse(flow.engine.isResting)
+        XCTAssertNil(flow.episodeID)
+        XCTAssertEqual(flow.milestones.lastReminderMultiple, 0)
+        assertNoReminder(flow)
+        flow.use(for: 100)
+        XCTAssertEqual(flow.reminderMultiples, [2, 1])
+    }
+
+    func testReturningFromShortSystemRestRespectsRecoveredFatigue() {
+        for startingFatigue in [180.0, 200.0, 220.0] {
+            var flow = ReminderFlow()
+            flow.use(for: startingFatigue)
+            flow.rest(for: 10, trigger: .screenLocked)
+            _ = flow.interrupt(systemReturn: true)
+
+            if startingFatigue < 200 {
+                assertNoReminder(flow)
+            } else {
+                XCTAssertEqual(flow.prompt, .manualRetry)
+                XCTAssertNotNil(flow.panel(mode: .fullScreen))
+                XCTAssertNil(flow.overlay(mode: .fullScreen))
+            }
+        }
+    }
+
+    func testLegacyLowFatigueRuntimeStaysHiddenAndRearmsAfterRestart() throws {
+        let date = Date(timeIntervalSince1970: 1_000)
+        for hadActiveRest in [false, true] {
+            let runtime = PersistedRuntimeState(
+                fatigue: 87,
+                restRequired: true,
+                overloadStartedAt: date.addingTimeInterval(-600),
+                overloadEpisodeID: UUID(),
+                continuousUsageDuration: 2_160,
+                activeRest: hadActiveRest ? ActiveRestSession(
+                    trigger: .manual,
+                    startedAt: date.addingTimeInterval(-10),
+                    startFatiguePercent: 174,
+                    elapsed: 10
+                ) : nil,
+                reminderPromptState: .manualRetry,
+                reminderDecisionPending: true,
+                lastReminderMultiple: 2,
+                savedAt: date
+            )
+            let recovered = RestRuntimePolicy.interruptedAttemptForRecovery(from: runtime)
+            XCTAssertEqual(recovered != nil, hadActiveRest)
+            if hadActiveRest {
+                let attempt = try XCTUnwrap(recovered)
+                XCTAssertEqual(attempt.endFatiguePercent, 87)
+                XCTAssertEqual(attempt.outcome, .interrupted(.cancelled))
+            }
+            var flow = ReminderFlow(runtime: runtime)
+            assertNoReminder(flow)
+            XCTAssertEqual(flow.milestones.lastReminderMultiple, 0)
+            flow.use(for: 13)
+            XCTAssertEqual(flow.reminderMultiples, [1])
+            XCTAssertNotNil(flow.panel(mode: .topPanel))
+            XCTAssertEqual(flow.episodeID, runtime.overloadEpisodeID)
+        }
+    }
+
+    func testLongerWorkTargetBelowThresholdHidesAndRearmsReminder() throws {
+        var flow = ReminderFlow()
+        flow.use(for: 180)
+        let episodeID = flow.episodeID
+        let events = try XCTUnwrap(flow.engine.updateDurations(
+            usageDurationForOneHundredPercent: 200,
+            requiredContinuousRestDuration: 20,
+            at: flow.now
+        ))
+        flow.apply(events)
+
+        XCTAssertEqual(flow.engine.snapshot.fatiguePercent, 90)
+        XCTAssertEqual(flow.milestones.lastReminderMultiple, 0)
+        assertNoReminder(flow)
+        flow.use(for: 20)
+        XCTAssertNotNil(flow.panel(mode: .topPanel))
+        XCTAssertEqual(flow.reminderMultiples, [1, 1])
+        XCTAssertEqual(flow.episodeID, episodeID)
+    }
+
+    private func assertNoReminder(
+        _ flow: ReminderFlow,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(flow.prompt, .hidden, file: file, line: line)
+        for mode in ReminderMode.allCases {
+            XCTAssertNil(flow.panel(mode: mode), file: file, line: line)
+            XCTAssertNil(flow.overlay(mode: mode), file: file, line: line)
+        }
+    }
+
+    private struct ReminderFlow {
+        var engine = FatigueEngine(usageDurationForOneHundredPercent: 100)
+        var prompt = ReminderPromptState.hidden
+        var milestones = FatigueReminderMilestones()
+        var episodeID: UUID?
+        var reminderMultiples: [Int] = []
+        var now = Date(timeIntervalSince1970: 1_000)
+
+        init(runtime: PersistedRuntimeState? = nil) {
+            guard let runtime else { return }
+            // AppModel records a recovered attempt before resuming with no active rest.
+            engine = FatigueEngine(
+                snapshot: FatigueSnapshot(
+                    fatiguePercent: runtime.fatigue,
+                    restRequired: runtime.restRequired,
+                    activeOverloadEpisode: OverloadEpisode(
+                        id: runtime.overloadEpisodeID ?? UUID(),
+                        startedAt: runtime.overloadStartedAt ?? runtime.savedAt,
+                        peakFatiguePercent: 180
+                    )
+                ),
+                usageDurationForOneHundredPercent: 100
+            )
+            prompt = RestRuntimePolicy.restoredPromptState(from: runtime)
+            milestones = FatigueReminderMilestones(
+                restoredLastReminderMultiple: runtime.lastReminderMultiple,
+                restRequired: runtime.restRequired,
+                fatigue: runtime.fatigue
+            )
+            episodeID = runtime.overloadEpisodeID
+            now = runtime.savedAt
+        }
+
+        mutating func use(for seconds: TimeInterval) {
+            now.addTimeInterval(seconds)
+            let events = engine.accrueUsage(for: seconds, endingAt: now)
+            apply(events)
+        }
+
+        mutating func rest(for seconds: TimeInterval, trigger: RestTrigger = .manual) {
+            let started = engine.beginRest(trigger: trigger, at: now)
+            apply(started)
+            now.addTimeInterval(seconds)
+            let advanced = engine.advanceRest(by: seconds, endingAt: now)
+            apply(advanced)
+        }
+
+        mutating func interrupt(systemReturn: Bool = false) -> [FatigueEvent] {
+            let events = engine.interruptRest(
+                reason: systemReturn ? .cancelled : .keyboard,
+                at: now
+            )
+            if systemReturn {
+                prompt = RestRuntimePolicy.promptStateAfterInterruptedSystemRest(
+                    restRequired: engine.snapshot.needsRestReminder
+                )
+            }
+            apply(events)
+            return events
+        }
+
+        mutating func apply(_ events: [FatigueEvent]) {
+            // Compose the real domain and presentation policies in AppModel's event order.
+            for event in events {
+                prompt = prompt.applying(event)
+                switch event {
+                case let .fatigueChanged(from, to, _):
+                    if episodeID != nil,
+                       let multiple = milestones.consumeNewMilestone(from: from, to: to) {
+                        prompt = .initialDecision
+                        reminderMultiples.append(multiple)
+                    }
+                case let .restRequired(episode):
+                    episodeID = episode.id
+                    if let multiple = milestones.registerInitialReminder(
+                        fatigue: episode.peakFatiguePercent
+                    ) {
+                        reminderMultiples.append(multiple)
+                    }
+                case .restCompleted:
+                    milestones.reset()
+                case .overloadCompleted:
+                    milestones.reset()
+                    episodeID = nil
+                case .restStarted, .restInterrupted, .continuedWorking:
+                    break
+                }
+            }
+        }
+
+        func panel(mode: ReminderMode) -> ReminderPanelPresentation? {
+            ReminderPresentationPolicy.panel(
+                restRequired: engine.snapshot.needsRestReminder,
+                isResting: engine.isResting,
+                promptState: prompt,
+                reminderMode: mode
+            )
+        }
+
+        func overlay(mode: ReminderMode) -> ReminderOverlayPhase? {
+            ReminderPresentationPolicy.overlay(
+                restRequired: engine.snapshot.needsRestReminder,
+                isResting: engine.isResting,
+                activeRestTrigger: engine.snapshot.activeRest?.trigger,
+                promptState: prompt,
+                reminderMode: mode
+            )
+        }
     }
 }

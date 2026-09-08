@@ -80,6 +80,7 @@ enum L10nKey: String, CaseIterable, Sendable {
     case languageSimplifiedChinese = "language.zh_hans"
     case languageEnglish = "language.english"
 
+    case appName = "app.name"
     case appAnalyticsWindowTitle = "app.analytics.window_title"
     case menuBarStatusAccessibilityLabel = "menubar.status.accessibility_label"
     case menuBarStatusAccessibilityValue = "menubar.status.accessibility_value"

@@ -132,7 +132,7 @@ quit_running_instances() {
         /bin/sleep 0.2
     done
 
-    fail "GazeEase 未能正常退出。请手动退出后重试；安装器不会强制结束进程。"
+    fail "护眼之道未能正常退出。请手动退出后重试；安装器不会强制结束进程。"
 }
 
 finish_install() {
@@ -195,7 +195,7 @@ fi
 
 trap finish_install EXIT
 
-printf '正在验证并准备 GazeEase %s (Build %s)...\n' "$SOURCE_VERSION" "$SOURCE_BUILD"
+printf '正在验证并准备护眼之道 %s (Build %s)...\n' "$SOURCE_VERSION" "$SOURCE_BUILD"
 /usr/bin/ditto "$SOURCE_APP" "$STAGE_APP"
 verify_local_app "$STAGE_APP"
 

@@ -7,7 +7,8 @@
 "language.english" = "English";
 
 /* Application and menu bar */
-"app.analytics.window_title" = "GazeEase 分析";
+"app.name" = "护眼之道";
+"app.analytics.window_title" = "护眼之道分析";
 "menubar.status.accessibility_label" = "护眼状态";
 "menubar.status.accessibility_value" = "疲劳度 %@";
 "menubar.status.accessibility_value.monitoring_incomplete" = "疲劳度 %@，监控不完整";
@@ -84,7 +85,7 @@
 "menu.action.begin_rest.hint_optional" = "立即开始一次完整休息";
 "menu.action.analytics" = "分析";
 "menu.action.settings" = "设置";
-"menu.action.quit" = "退出 GazeEase";
+"menu.action.quit" = "退出护眼之道";
 "menu.resting" = "正在休息";
 "menu.rest_remaining" = "还需 %d 秒";
 "menu.monitoring_incomplete" = "监控不完整";
@@ -165,18 +166,18 @@
 "settings.data_storage.local_only" = "仅保存在这台 Mac";
 "settings.clear_data" = "清除所有分析数据";
 "settings.section.privacy" = "隐私";
-"settings.privacy.description" = "GazeEase 不读取或录制屏幕内容，不需要屏幕录制权限。自动休息只读取系统提供的距最近一次输入时长。App 不保存按键、鼠标坐标、窗口标题、音频或剪贴板内容，也不会上传监控数据。";
+"settings.privacy.description" = "护眼之道不读取或录制屏幕内容，不需要屏幕录制权限。自动休息只读取系统提供的距最近一次输入时长。App 不保存按键、鼠标坐标、窗口标题、音频或剪贴板内容，也不会上传监控数据。";
 "settings.clear_data.alert_title" = "清除所有分析数据？";
 "settings.clear_data.cancel" = "取消";
 "settings.clear_data.confirm" = "清除";
 "settings.clear_data.alert_message" = "疲劳历史、休息记录和汇总数据都会被永久删除，当前疲劳状态不会改变。";
 
 /* Onboarding */
-"onboarding.window_title" = "欢迎使用 GazeEase";
+"onboarding.window_title" = "欢迎使用护眼之道";
 "onboarding.language.label" = "语言";
 "onboarding.language.accessibility_label" = "选择 App 语言";
 "onboarding.title" = "让休息自然发生";
-"onboarding.subtitle" = "GazeEase 根据输入活动估算用眼疲劳，在合适的时候提醒你望向远处、放松眼睛。";
+"onboarding.subtitle" = "护眼之道根据输入活动估算用眼疲劳，在合适的时候提醒你望向远处、放松眼睛。";
 "onboarding.permission.title" = "允许输入监控";
 "onboarding.permission.description" = "用于判断你是否正在使用电脑。只读取输入事件类型和时间，不记录按键内容或鼠标坐标。";
 "onboarding.permission.authorize" = "去授权";
@@ -191,7 +192,7 @@
 "onboarding.permission.status.ready" = "输入监控已就绪";
 "onboarding.privacy.title" = "数据只留在这台 Mac";
 "onboarding.privacy.description" = "不读取屏幕内容，不保存按键、鼠标坐标、窗口标题、音频或剪贴板，也不会上传监控数据。";
-"onboarding.finish" = "开始使用 GazeEase";
+"onboarding.finish" = "开始使用护眼之道";
 "onboarding.finish.accessibility_hint" = "关闭新手指引并开始使用";
 
 /* Analytics */

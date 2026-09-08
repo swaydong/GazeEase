@@ -1,5 +1,5 @@
 GazeEase Private Test Build — Installation Guide
-Version 1.1.0 (Build 37)
+Version 1.1.0 (Build 39)
 
 Important
 
