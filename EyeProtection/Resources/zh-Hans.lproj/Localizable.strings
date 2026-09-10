@@ -8,7 +8,7 @@
 
 /* Application and menu bar */
 "app.name" = "护眼之道";
-"app.analytics.window_title" = "护眼之道分析";
+"app.analytics.window_title" = "分析";
 "menubar.status.accessibility_label" = "护眼状态";
 "menubar.status.accessibility_value" = "疲劳度 %@";
 "menubar.status.accessibility_value.monitoring_incomplete" = "疲劳度 %@，监控不完整";
@@ -196,7 +196,7 @@
 "onboarding.finish.accessibility_hint" = "关闭新手指引并开始使用";
 
 /* Analytics */
-"analytics.title" = "用眼分析";
+"analytics.title" = "分析";
 "analytics.disclaimer" = "疲劳度是根据本机活动估算的行为指标，不是医学诊断。";
 "analytics.range.label" = "时间范围";
 "analytics.range.today" = "今天";

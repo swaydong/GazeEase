@@ -3,6 +3,21 @@ import XCTest
 @testable import EyeProtection
 
 final class LocalizationTests: XCTestCase {
+    func testPageAndWindowTitlesUseSimpleLocalizedNames() {
+        for (language, analyticsTitle, settingsTitle) in [
+            (AppLanguage.zhHans, "分析", "设置"),
+            (AppLanguage.english, "Analytics", "Settings")
+        ] {
+            for key in [L10nKey.appAnalyticsWindowTitle, .analyticsTitle, .menuActionAnalytics] {
+                XCTAssertEqual(AppLocalization.string(key, language: language), analyticsTitle)
+            }
+            XCTAssertEqual(
+                AppLocalization.string(.menuActionSettings, language: language),
+                settingsTitle
+            )
+        }
+    }
+
     func testPersistedLanguageRestorationDefaultsUnknownValuesToSystem() {
         XCTAssertEqual(AppLanguage.restored(fromPersistedValue: nil), .system)
         XCTAssertEqual(AppLanguage.restored(fromPersistedValue: ""), .system)

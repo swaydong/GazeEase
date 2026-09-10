@@ -8,7 +8,7 @@
 
 /* Application and menu bar */
 "app.name" = "GazeEase";
-"app.analytics.window_title" = "GazeEase Analytics";
+"app.analytics.window_title" = "Analytics";
 "menubar.status.accessibility_label" = "Eye comfort status";
 "menubar.status.accessibility_value" = "Fatigue %@";
 "menubar.status.accessibility_value.monitoring_incomplete" = "Fatigue %@, monitoring incomplete";
@@ -196,7 +196,7 @@
 "onboarding.finish.accessibility_hint" = "Close this guide and start using GazeEase";
 
 /* Analytics */
-"analytics.title" = "Eye Comfort Analytics";
+"analytics.title" = "Analytics";
 "analytics.disclaimer" = "Fatigue is a behavioral estimate based on activity on this Mac, not a medical diagnosis.";
 "analytics.range.label" = "Time Range";
 "analytics.range.today" = "Today";

@@ -48,13 +48,19 @@
 
 “输入监控”只用于判断是否操作电脑、是否中断休息，不记录你输入了什么。App 不申请“屏幕录制”，不保存屏幕内容或按键内容，也不发送遥测数据；处理和存储都在本机完成。[查看隐私说明 →](PRIVACY.zh-CN.md)
 
-## 从源码体验
+## 下载测试版
 
-Version `1.1.0`、Build `39` **仅公开源码，暂不提供通用安装包**。现有开发包未使用 Developer ID 签名、未经过 Apple 公证，不是面向所有人的公开安装器。
+**[下载 macOS 测试版 →](https://github.com/swaydong/GazeEase/releases/download/v1.1.0-test.40/GazeEase-1.1.0-build40-macos-test.zip)** · Version `1.1.0`、Build `40` · [版本说明](https://github.com/swaydong/GazeEase/releases/tag/v1.1.0-test.40)
 
-自行运行需要 macOS 14+ 和 Xcode 16+。打开 `EyeProtection.xcodeproj`，选择自己的 Team 与独立 Bundle Identifier，构建后按提示授予“输入监控”权限。[开发环境与测试说明 →](CONTRIBUTING.zh-CN.md)
+需要 macOS 14+，包含 Apple 芯片和 Intel 双架构。无需 Xcode：解压 ZIP，将 `GazeEase.app` 拖入“应用程序”，再从那里打开。
 
-已有本机包请看[安装、升级与卸载](INSTALL.zh-CN.md)。为兼容原有安装，App 文件名仍为 `GazeEase.app`，中文显示名为“护眼之道”。
+这是 **Apple Development 签名、未经 Apple 公证的预发布测试版**，不是 Developer ID 公证版。首次可能被 macOS 拦截；只有确认下载来自本项目官方发布页且未被篡改，才按 Apple 的“仍要打开”流程操作。尚未完成另一台干净 Mac 的测试，不保证所有 Mac 都能运行。[安装、安全提示与限制 →](INSTALL.zh-CN.md)
+
+### 从源码构建
+
+开发需要 macOS 14+ 和 Xcode 16+。打开 `EyeProtection.xcodeproj`，选择自己的 Team 与独立 Bundle Identifier，构建后按提示授予“输入监控”权限。[开发环境与测试说明 →](CONTRIBUTING.zh-CN.md)
+
+为兼容原有安装，App 文件名仍为 `GazeEase.app`，中文显示名为“护眼之道”。
 
 ## 开源与许可
 

@@ -9,6 +9,9 @@
 ## Distribution / 分发范围
 
 - Source only / 仅源码：No ready-to-install binary is included. / 不附带通用安装包。
+- Unnotarized test binary / 未公证测试包：Mark as a prerelease, disclose the signing
+  identity and first-launch warning, and state any unverified target-Mac checks.
+  / 标记为测试版，说明签名、首次启动提示及尚未完成的目标 Mac 验证。
 - Code: MIT; visual and brand assets: separate limited terms. Link to `LICENSE`
   and `ASSETS.md` at this release's tag. / 代码采用 MIT；视觉与品牌资产适用独立有限许可，请链接到本版本标签下的 `LICENSE` 与 `ASSETS.md`。
 
@@ -58,14 +61,14 @@ do not produce a public installer. / 仅源码版本请按本标签下的 README
 
 ## Optional binary installation / 可选：安装包使用方式
 
-> Keep this section only when a verified, notarized binary is attached. Local
-> Apple Development and trusted-test packages do not qualify.
+> State explicitly whether the attached binary is notarized or an unnotarized
+> test build. Never attach the maintainer's local-only installer as a public app.
 >
-> 仅在附有已验证、公证的安装包时保留本节；Apple Development 本机包和小范围测试包不适用。
+> 明确说明附件是已公证版本还是未公证测试包。不要将维护者本机专用安装器当作公众安装包。
 
 ### English
 
-1. Download the attached notarized archive or disk image.
+1. Download the attached app archive or disk image, not GitHub's source archive.
 2. Move GazeEase to Applications.
 3. Open it and follow the Input Monitoring permission guide.
 4. Replace the existing app in place when upgrading so macOS can preserve its
@@ -73,7 +76,7 @@ do not produce a public installer. / 仅源码版本请按本标签下的 README
 
 ### 中文
 
-1. 下载附件中的已公证压缩包或磁盘映像。
+1. 下载附件中的 App 压缩包或磁盘映像，不要下载 GitHub 自动生成的源码压缩包。
 2. 将护眼之道移入“应用程序”。
 3. 打开 App，并按引导授予“输入监控”权限。
 4. 升级时请在原位置替换现有 App，以便 macOS 继续识别其身份与权限。
@@ -85,14 +88,19 @@ do not produce a public installer. / 仅源码版本请按本标签下的 README
 - [ ] Published files contain no credentials, personal data, or local build output. / 公开文件不含凭据、个人数据或本机构建产物。
 - [ ] Privacy and license documentation matches this release. / 隐私和许可文档与本版本一致。
 
-### Only when distributing a binary / 仅安装包发布时
+### When distributing any binary / 所有安装包发布时
 
 - [ ] Release build is universal `arm64` + `x86_64`. / Release 同时包含 `arm64` 与 `x86_64`。
-- [ ] Signed with Developer ID Application and hardened runtime. / 已使用 Developer ID Application 和 Hardened Runtime 签名。
+- [ ] Signing identity is stated and the signature is valid. / 已说明签名身份并通过验签。
 - [ ] `get-task-allow` is absent or false. / `get-task-allow` 不存在或为 false。
+- [ ] Bundle ID, team, app name, and upgrade path were checked. / 已核对 Bundle ID、团队、App 名称和升级路径。
+- [ ] State whether a fresh installation was tested on a separate Mac. / 如实说明是否在另一台 Mac 完成首次安装测试。
+
+### Only when claiming a notarized release / 仅声明已公证版本时
+
+- [ ] Signed with Developer ID Application and hardened runtime. / 已使用 Developer ID Application 和 Hardened Runtime 签名。
 - [ ] Apple notarization succeeded and the ticket is stapled. / Apple 公证成功且票据已装订。
 - [ ] `codesign`, `spctl`, and `stapler validate` checks passed. / `codesign`、`spctl` 与 `stapler validate` 均通过。
-- [ ] Bundle ID, team, app name, and upgrade path were checked. / 已核对 Bundle ID、团队、App 名称和升级路径。
 - [ ] Multi-display, full-screen, lock/sleep, and permission-revocation flows were checked. / 已验证多显示器、全屏、锁屏/睡眠与权限撤销。
 
 ## Optional binary downloads and checksums / 可选：安装包与校验值

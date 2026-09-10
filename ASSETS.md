@@ -41,7 +41,9 @@ editing, arrangement, branding, and derivatives. These assets are not licensed
 under the MIT license covering the source code.
 
 You may use the covered assets only as necessary to build, test, evaluate, and
-contribute to GazeEase from this repository. No permission is granted to:
+contribute to GazeEase from this repository. You may also install and run an
+unmodified official GazeEase release with its bundled assets. No permission is
+granted to:
 
 - extract or redistribute the assets as a standalone collection;
 - reuse them in another application, website, product, template, or dataset;
@@ -50,7 +52,7 @@ contribute to GazeEase from this repository. No permission is granted to:
 
 **保留所有权利。** 项目所有者在适用法律允许的范围内，保留对上述资产系列以及由人工主导的筛选、编辑、编排、品牌化和衍生成果的全部权利。这些资产不适用 MIT，也不适用任何可能覆盖源代码的其他开源许可证。
 
-你只能为构建、测试、评估护眼之道或向本项目贡献代码而使用这些资产。未经另行书面授权，不得单独提取或再分发、用于其他产品或数据集、出售或转授权、用于模型训练或评估，也不得暗示与护眼之道或项目所有者存在背书或隶属关系。
+你可以为构建、测试、评估护眼之道或向本项目贡献代码而使用这些资产，也可以安装并运行包含这些资产的未修改官方发行版本。未经另行书面授权，不得单独提取或再分发、用于其他产品或数据集、出售或转授权、用于模型训练或评估，也不得暗示与护眼之道或项目所有者存在背书或隶属关系。
 
 ## Other brand assets / 其他品牌资产
 

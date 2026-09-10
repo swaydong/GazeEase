@@ -48,13 +48,17 @@ Screenshots show the Chinese interface with demonstration data, not a user's act
 
 Input Monitoring is used to detect activity and rest interruptions—not to record what you type. GazeEase does not request Screen Recording, store screen content or key contents, or send telemetry. All processing and storage stay on your Mac. [Read the privacy statement →](PRIVACY.md)
 
-## Try it from source
+## Download the test build
 
-Version `1.1.0`, Build `39` is a **source-only public release**, not a ready-to-install public download. Existing development packages are not Developer ID signed or notarized and are not general-purpose public installers.
+**[Download for macOS →](https://github.com/swaydong/GazeEase/releases/download/v1.1.0-test.40/GazeEase-1.1.0-build40-macos-test.zip)** · Version `1.1.0`, Build `40` · [Release notes](https://github.com/swaydong/GazeEase/releases/tag/v1.1.0-test.40)
 
-To run your own copy, use macOS 14+ and Xcode 16+. Open `EyeProtection.xcodeproj`, select your own Team and a unique Bundle Identifier, then build and grant Input Monitoring when prompted. [Development setup and tests →](CONTRIBUTING.md)
+Requires macOS 14+; includes Apple silicon and Intel builds. No Xcode needed: extract the ZIP, drag `GazeEase.app` into Applications, and open it there.
 
-For existing local packages, see [installation, upgrades, and uninstall](INSTALL.md).
+This is an **Apple Development-signed, unnotarized prerelease**, not a Developer ID-notarized release. macOS may block its first launch; only use Apple's **Open Anyway** flow after verifying that the download is from this official release and has not been altered. A separate clean Mac has not yet been tested, so compatibility is not guaranteed. [Installation, security warnings, and limitations →](INSTALL.md)
+
+### Build from source
+
+For development, use macOS 14+ and Xcode 16+. Open `EyeProtection.xcodeproj`, select your own Team and a unique Bundle Identifier, then build and grant Input Monitoring when prompted. [Development setup and tests →](CONTRIBUTING.md)
 
 ## Open source
 

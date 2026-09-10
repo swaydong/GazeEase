@@ -344,6 +344,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .navigationTitle(localized(.menuActionSettings))
         .frame(width: 560, height: 650)
         .onAppear {
             resetDurationInputs()

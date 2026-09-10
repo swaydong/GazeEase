@@ -6,7 +6,7 @@ IFS=$'\n\t'
 readonly EXPECTED_BUNDLE_ID="com.local.EyeProtection"
 readonly EXPECTED_TEAM_ID="3Q9DKW2UKF"
 readonly EXPECTED_EXECUTABLE="Eye Protection"
-readonly EXPECTED_BUILD="39"
+readonly EXPECTED_BUILD="40"
 readonly EXPECTED_VERSION="1.1.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -16,7 +16,7 @@ OUTPUT_DIR="$DIST_DIR/TrustedTest"
 SOURCE_BASENAME="GazeEase-${EXPECTED_VERSION}-build${EXPECTED_BUILD}-local"
 SOURCE_ARCHIVE="$DIST_DIR/$SOURCE_BASENAME.zip"
 SOURCE_CHECKSUM="$SOURCE_ARCHIVE.sha256"
-PACKAGE_BASENAME="GazeEase-${EXPECTED_VERSION}-build${EXPECTED_BUILD}-trusted-test"
+PACKAGE_BASENAME="GazeEase-${EXPECTED_VERSION}-build${EXPECTED_BUILD}-macos-test"
 OUTPUT_ARCHIVE="$OUTPUT_DIR/$PACKAGE_BASENAME.zip"
 OUTPUT_CHECKSUM="$OUTPUT_ARCHIVE.sha256"
 TEMP_BASE="${TMPDIR:-/tmp}"
@@ -79,7 +79,8 @@ verify_test_app() {
 
     [[ "$signing_output" == *"(runtime)"* ]] || fail "Hardened Runtime is missing from: $app_path"
 
-    entitlements="$(/usr/bin/codesign -d --entitlements :- "$app_path" 2>/dev/null || true)"
+    entitlements="$(/usr/bin/codesign -d --entitlements :- "$app_path" 2>/dev/null)" || \
+        fail "Unable to inspect signing entitlements: $app_path"
     if [[ "$allow_debug_entitlement" != "true" ]]; then
         [[ "$entitlements" != *"com.apple.security.get-task-allow"* ]] || \
             fail "Debug entitlement get-task-allow must not be present in the trusted test app."
@@ -106,7 +107,7 @@ cleanup() {
     exit "$result"
 }
 
-for required_command in awk codesign ditto lipo plutil security shasum unzip xattr; do
+for required_command in awk codesign ditto lipo plutil security shasum strip unzip xattr; do
     require_command "$required_command"
 done
 
@@ -117,6 +118,7 @@ for required_file in \
     "$PROJECT_ROOT/Packaging/TRUSTED_TEST_INSTALL.en.txt" \
     "$PROJECT_ROOT/PRIVACY.md" \
     "$PROJECT_ROOT/PRIVACY.zh-CN.md" \
+    "$PROJECT_ROOT/EyeProtection/Resources/EyeProtection.entitlements" \
     "$PROJECT_ROOT/LICENSE" \
     "$PROJECT_ROOT/ASSETS.md"; do
     [[ -f "$required_file" ]] || fail "Required packaging input is missing: $required_file"
@@ -164,11 +166,15 @@ fi
 /usr/bin/ditto "$SOURCE_APP" "$PACKAGE_DIR/GazeEase.app"
 /usr/bin/ditto "$PROJECT_ROOT/LICENSE" "$PACKAGE_DIR/LICENSE"
 /usr/bin/ditto "$PROJECT_ROOT/ASSETS.md" "$PACKAGE_DIR/ASSETS.md"
+# Remove compiler debug symbols (including local source paths) before sealing
+# the distributable copy. The source archive and installed app stay untouched.
+/usr/bin/strip -S "$PACKAGE_DIR/GazeEase.app/Contents/MacOS/$EXPECTED_EXECUTABLE"
 /usr/bin/codesign \
     --force \
     --sign "$SOURCE_AUTHORITY" \
     --options runtime \
     --timestamp=none \
+    --entitlements "$PROJECT_ROOT/EyeProtection/Resources/EyeProtection.entitlements" \
     "$PACKAGE_DIR/GazeEase.app"
 /usr/bin/ditto "$PROJECT_ROOT/Packaging/TRUSTED_TEST_INSTALL.zh-CN.txt" "$PACKAGE_DIR/请先阅读-安装说明.txt"
 /usr/bin/ditto "$PROJECT_ROOT/Packaging/TRUSTED_TEST_INSTALL.en.txt" "$PACKAGE_DIR/READ ME - Installation.txt"
@@ -177,7 +183,7 @@ fi
 
 DELIVERED_ARCHITECTURES="$(/usr/bin/lipo -archs "$PACKAGE_DIR/GazeEase.app/Contents/MacOS/$EXPECTED_EXECUTABLE")"
 {
-    printf 'GazeEase trusted test build\n'
+    printf 'GazeEase / 护眼之道 macOS test build\n'
     printf 'Version: %s\n' "$EXPECTED_VERSION"
     printf 'Build: %s\n' "$EXPECTED_BUILD"
     printf 'Bundle ID: %s\n' "$EXPECTED_BUNDLE_ID"
@@ -185,7 +191,9 @@ DELIVERED_ARCHITECTURES="$(/usr/bin/lipo -archs "$PACKAGE_DIR/GazeEase.app/Conte
     printf 'Signing: Apple Development\n'
     printf 'Architectures: %s\n' "$DELIVERED_ARCHITECTURES"
     printf 'Notarized: No\n'
-    printf 'Distribution: Trusted testers only; do not redistribute\n'
+    printf 'Distribution: Public test download; not notarized\n'
+    printf 'Official releases: https://github.com/swaydong/GazeEase/releases\n'
+    printf 'Fresh installation on a separate Mac: Not yet verified\n'
 } > "$PACKAGE_DIR/BUILD-INFO.txt"
 
 verify_test_app "$PACKAGE_DIR/GazeEase.app"
@@ -202,6 +210,6 @@ printf '%s  %s\n' "$ARCHIVE_DIGEST" "$PACKAGE_BASENAME.zip" > "$TEMP_CHECKSUM"
 /bin/mv "$TEMP_ARCHIVE" "$OUTPUT_ARCHIVE"
 /bin/mv "$TEMP_CHECKSUM" "$OUTPUT_CHECKSUM"
 
-printf '\nCreated trusted test package:\n  %s\n  %s\n' "$OUTPUT_ARCHIVE" "$OUTPUT_CHECKSUM"
+printf '\nCreated macOS test package:\n  %s\n  %s\n' "$OUTPUT_ARCHIVE" "$OUTPUT_CHECKSUM"
 printf 'This package is Apple Development signed and not notarized. Gatekeeper confirmation is expected.\n'
-printf 'Send it only to trusted testers together with the checksum and installation guide.\n'
+printf 'Publish as a prerelease with the checksum and installation guide; fresh installation on a separate Mac remains unverified.\n'
